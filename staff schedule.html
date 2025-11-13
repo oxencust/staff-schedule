@@ -1,0 +1,1380 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>衡點-個人排班系統</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&display=swap');
+        
+        :root {
+            --white: #ffffff;
+            --gray: #808080;
+            --green: #7ac19a;
+            --green-light: #e2ede6;
+            --green-dark: #5f846f;
+            --pink: #f2ac98;
+            --pink-light: #faece8;
+            --pink-dark: #c67566;
+            --yellow: #ffe08b;
+            --yellow-light: #fcf4e3;
+            --yellow-dark: #ba9e60;
+            --blue: #9fcccc;
+            --blue-light: #daedec;
+            --blue-dark: #66888e;
+        }
+
+        * { 
+            margin: 0; 
+            padding: 0; 
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        body { 
+            font-family: 'Noto Sans TC', sans-serif; 
+            background: #f8f9fa; 
+            color: #2d3748; 
+            padding-bottom: 20px;
+            overflow-x: hidden;
+        }
+        
+        .loading-screen { 
+            position: fixed; 
+            top: 0; left: 0; right: 0; bottom: 0; 
+            background: linear-gradient(135deg, var(--green-light), var(--pink-light)); 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center; 
+            z-index: 9999; 
+        }
+        .loading-screen.hidden { display: none; }
+        .loading-spinner { 
+            width: 60px; height: 60px; 
+            border: 4px solid var(--green-light); 
+            border-top-color: var(--green); 
+            border-radius: 50%; 
+            animation: spin 1s linear infinite; 
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .navbar { 
+            background: linear-gradient(135deg, var(--pink), var(--pink-dark)); 
+            padding: 16px 20px; 
+            color: white; 
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .navbar h1 { 
+            font-size: 18px; 
+            margin-bottom: 6px; 
+        }
+        .navbar p { 
+            font-size: 14px; 
+            opacity: 0.95;
+            line-height: 1.6;
+        }
+        .staff-name {
+            font-weight: 700;
+            font-size: 16px;
+            color: #fff;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+            display: inline-block;
+            padding: 2px 0;
+        }
+
+        .container { 
+            max-width: 1200px; 
+            margin: 0 auto; 
+            padding: 15px; 
+        }
+        
+        .info-card { 
+            background: white;
+            border-radius: 10px; 
+            padding: 12px 15px; 
+            margin-bottom: 15px; 
+            border-left: 3px solid var(--pink);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+        }
+        .info-card h3 { 
+            font-size: 13px; 
+            color: var(--pink-dark); 
+            margin-bottom: 6px; 
+            display: flex; 
+            align-items: center; 
+            gap: 6px; 
+        }
+        .info-card ul { margin-top: 6px; padding-left: 16px; }
+        .info-card li { font-size: 11px; line-height: 1.5; color: #2d3748; margin-bottom: 2px; }
+
+        .control-panel { 
+            background: white; 
+            border-radius: 12px; 
+            padding: 15px; 
+            margin-bottom: 15px; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.08); 
+        }
+        
+        .month-selector { 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            gap: 15px; 
+            margin-bottom: 15px; 
+        }
+        .month-btn { 
+            width: 40px; 
+            height: 40px; 
+            border-radius: 10px; 
+            border: none; 
+            background: var(--pink); 
+            color: white; 
+            font-size: 18px; 
+            cursor: pointer; 
+            transition: all 0.2s;
+            touch-action: manipulation;
+        }
+        .month-btn:active { 
+            transform: scale(0.95);
+            background: var(--pink-dark); 
+        }
+        .month-display { 
+            font-size: 20px; 
+            font-weight: 700; 
+            text-align: center;
+            min-width: 150px;
+        }
+
+        .stats-grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); 
+            gap: 10px; 
+            margin-bottom: 15px; 
+        }
+        .stat-card { 
+            background: white; 
+            border-radius: 10px; 
+            padding: 12px; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.08); 
+            border-left: 3px solid;
+            text-align: center;
+        }
+        .stat-card.pink { border-left-color: var(--pink); }
+        .stat-card.yellow { border-left-color: var(--yellow); }
+        .stat-card.green { border-left-color: var(--green); }
+        .stat-label { font-size: 11px; color: var(--gray); margin-bottom: 6px; }
+        .stat-value { font-size: 24px; font-weight: 700; }
+        .stat-card.pink .stat-value { color: var(--pink); }
+        .stat-card.yellow .stat-value { color: var(--yellow); }
+        .stat-card.green .stat-value { color: var(--green); }
+
+        .legend { 
+            background: white; 
+            border-radius: 8px; 
+            padding: 12px 15px; 
+            margin-bottom: 0; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.08); 
+        }
+        .legend h4 { 
+            font-size: 12px; 
+            margin-bottom: 8px; 
+            color: var(--pink-dark); 
+        }
+        .legend-grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); 
+            gap: 6px; 
+        }
+        .legend-item { 
+            display: flex; 
+            align-items: center; 
+            gap: 6px; 
+            padding: 6px 8px; 
+            background: #f8f9fa; 
+            border-radius: 5px; 
+        }
+        .legend-box { 
+            width: 14px; 
+            height: 14px; 
+            border-radius: 3px; 
+            flex-shrink: 0; 
+        }
+        .legend-box.available { background: white; border: 2px solid #e9ecef; }
+        .legend-box.unavailable { background: var(--pink); }
+        .legend-box.weekend { background: var(--blue-light); border: 2px solid var(--blue); }
+        .legend-box.holiday { background: var(--yellow-light); border: 2px solid var(--yellow); }
+        .legend-box.workday { background: var(--green-light); border: 2px solid var(--green); }
+        .legend-box.festival { 
+            background: white; 
+            border: 2px solid;
+            border-image: linear-gradient(45deg, #ff6b9d, #ffa07a, #ffd700, #98fb98, #87ceeb, #da70d6) 1;
+        }
+        .legend-label { font-size: 10px; font-weight: 600; }
+
+        .calendar-container { 
+            background: white; 
+            border-radius: 12px; 
+            padding: 10px; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.08); 
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        .calendar { 
+            min-width: 100%;
+        }
+        
+        .calendar-header { 
+            display: grid; 
+            grid-template-columns: 50px repeat(7, 1fr); 
+            gap: 2px; 
+            margin-bottom: 8px; 
+        }
+        .calendar-header-cell { 
+            text-align: center; 
+            padding: 8px 4px; 
+            font-weight: 700; 
+            font-size: 12px;
+            background: var(--pink-light); 
+            border-radius: 6px; 
+        }
+        .calendar-header-cell:first-child { background: transparent; }
+        .calendar-header-cell.weekend { background: var(--blue-light); color: var(--blue-dark); }
+
+        .week-row { 
+            display: grid; 
+            grid-template-columns: 50px repeat(7, 1fr); 
+            gap: 2px; 
+            margin-bottom: 2px; 
+        }
+        .week-label { 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            font-weight: 600; 
+            font-size: 11px;
+            color: var(--gray); 
+            background: #f8f9fa; 
+            border-radius: 6px; 
+        }
+
+        .day-cell { 
+            min-height: 70px; 
+            padding: 6px; 
+            background: white; 
+            border: 2px solid #e9ecef; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            position: relative; 
+            transition: all 0.2s;
+            touch-action: manipulation;
+        }
+        .day-cell:active { 
+            transform: scale(0.98);
+        }
+        .day-cell.weekend { 
+            background: var(--blue-light); 
+            border-color: var(--blue); 
+        }
+        .day-cell.holiday { 
+            background: var(--yellow-light); 
+            border-color: var(--yellow); 
+        }
+        .day-cell.workday { 
+            background: var(--green-light); 
+            border-color: var(--green); 
+        }
+        
+        .day-cell.festival { 
+            background: white;
+            border: 3px solid;
+            border-image: linear-gradient(45deg, #ff6b9d, #ffa07a, #ffd700, #98fb98, #87ceeb, #da70d6) 1;
+        }
+        
+        .day-cell.today { 
+            border-color: var(--pink); 
+            border-width: 3px; 
+            box-shadow: 0 0 0 1px var(--pink); 
+        }
+        .day-cell.unavailable { 
+            background: var(--pink); 
+            border-color: var(--pink-dark); 
+        }
+        .day-cell.unavailable .day-number { color: white; }
+        .day-cell.unavailable .status-label { color: white; opacity: 0.9; }
+
+        /* 班別標籤樣式 */
+        .shift-badges {
+            display: flex;
+            gap: 3px;
+            margin-top: 4px;
+            flex-wrap: wrap;
+        }
+        .shift-badge {
+            font-size: 9px;
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+        .shift-badge.afternoon {
+            background: #dbeafe;
+            color: #1e40af;
+            border: 1px solid #93c5fd;
+        }
+        .shift-badge.evening {
+            background: #e0e7ff;
+            color: #4338ca;
+            border: 1px solid #a5b4fc;
+        }
+        .day-cell.unavailable .shift-badge {
+            background: rgba(255,255,255,0.3);
+            color: white;
+            border-color: rgba(255,255,255,0.5);
+        }
+
+        /* 班別選擇對話框 */
+        .shift-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1500;
+            align-items: center;
+            justify-content: center;
+        }
+        .shift-modal.show {
+            display: flex;
+        }
+        .shift-modal-content {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            max-width: 90%;
+            width: 320px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+        }
+        .shift-modal-header {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--pink-dark);
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .shift-modal-date {
+            font-size: 14px;
+            color: var(--gray);
+            margin-bottom: 16px;
+        }
+        .shift-options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+        .shift-option {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: white;
+        }
+        .shift-option:active {
+            transform: scale(0.98);
+        }
+        .shift-option.selected {
+            border-color: var(--pink);
+            background: var(--pink-light);
+        }
+        .shift-option-checkbox {
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--gray);
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+        .shift-option.selected .shift-option-checkbox {
+            background: var(--pink);
+            border-color: var(--pink);
+        }
+        .shift-option.selected .shift-option-checkbox::after {
+            content: '✓';
+            color: white;
+            font-weight: 700;
+        }
+        .shift-option-label {
+            flex: 1;
+        }
+        .shift-option-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+        .shift-option-time {
+            font-size: 11px;
+            color: var(--gray);
+        }
+        .shift-modal-buttons {
+            display: flex;
+            gap: 8px;
+        }
+        .shift-modal-btn {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+        .shift-modal-btn.cancel {
+            background: #e9ecef;
+            color: #495057;
+        }
+        .shift-modal-btn.confirm {
+            background: var(--pink);
+            color: white;
+        }
+
+        .day-header { 
+            display: flex; 
+            align-items: flex-start;
+            gap: 4px; 
+            margin-bottom: 3px; 
+            flex-wrap: wrap; 
+        }
+        .day-number { 
+            font-size: 14px; 
+            font-weight: 700; 
+        }
+        .day-cell.weekend .day-number { color: var(--blue-dark); }
+        .day-cell.holiday .day-number { color: var(--yellow-dark); }
+        .day-cell.workday .day-number { color: var(--green-dark); }
+        
+        .festival-badge { 
+            font-size: 8px; 
+            font-weight: 600;
+            padding: 2px 4px;
+            border-radius: 3px;
+            background: linear-gradient(45deg, #ff6b9d, #ffa07a);
+            color: white;
+            white-space: nowrap;
+        }
+        
+        .status-label { 
+            font-size: 10px; 
+            font-weight: 600; 
+            display: block; 
+        }
+        
+        .holiday-label { color: var(--yellow-dark); }
+        .weekend-label { color: var(--blue-dark); }
+        .workday-label { color: var(--green-dark); }
+        
+        .unavailable-icon { 
+            position: absolute; 
+            top: 50%; 
+            left: 50%; 
+            transform: translate(-50%, -50%); 
+            font-size: 24px; 
+        }
+
+        .action-buttons { 
+            display: flex; 
+            gap: 10px; 
+            margin-top: 15px; 
+        }
+        .btn { 
+            flex: 1; 
+            padding: 14px; 
+            border: none; 
+            border-radius: 10px; 
+            font-size: 14px; 
+            font-weight: 600; 
+            cursor: pointer; 
+            transition: all 0.2s; 
+            font-family: inherit;
+            touch-action: manipulation;
+        }
+        .btn:active { 
+            transform: scale(0.98);
+        }
+        .btn-primary { 
+            background: var(--pink); 
+            color: white; 
+        }
+        .btn-secondary { 
+            background: var(--green-light); 
+            color: var(--green-dark); 
+        }
+
+        /* 確認對話框 */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-overlay.show {
+            display: flex;
+        }
+        .modal {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            max-width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+        }
+        .modal-header {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--pink-dark);
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .modal-content {
+            margin-bottom: 20px;
+        }
+        .date-list {
+            max-height: 300px;
+            overflow-y: auto;
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 12px;
+        }
+        .date-item {
+            padding: 8px 12px;
+            margin-bottom: 6px;
+            background: white;
+            border-radius: 6px;
+            border-left: 3px solid var(--pink);
+            font-size: 13px;
+        }
+        .date-item-shifts {
+            display: flex;
+            gap: 4px;
+            margin-top: 4px;
+        }
+        .modal-summary {
+            font-size: 14px;
+            padding: 12px;
+            background: var(--pink-light);
+            border-radius: 8px;
+            margin-bottom: 16px;
+            color: var(--pink-dark);
+            font-weight: 600;
+        }
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+        }
+        .modal-btn {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+        .modal-btn-confirm {
+            background: var(--pink);
+            color: white;
+        }
+        .modal-btn-cancel {
+            background: #e9ecef;
+            color: #495057;
+        }
+
+        .toast { 
+            position: fixed; 
+            bottom: 20px; 
+            left: 50%; 
+            transform: translateX(-50%) translateY(100px); 
+            background: #2d3748; 
+            color: white; 
+            padding: 12px 18px; 
+            border-radius: 10px; 
+            z-index: 2000; 
+            transition: transform 0.3s; 
+            font-weight: 500; 
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            font-size: 13px;
+            max-width: 90%;
+        }
+        .toast.show { transform: translateX(-50%) translateY(0); }
+
+        @media (min-width: 768px) {
+            .navbar h1 { font-size: 20px; }
+            .navbar p { font-size: 15px; }
+            .staff-name { font-size: 18px; }
+            .container { padding: 20px; }
+            .month-display { font-size: 24px; min-width: 200px; }
+            .stats-grid { grid-template-columns: repeat(3, 1fr); }
+            .stat-value { font-size: 28px; }
+            .calendar-header-cell { font-size: 13px; padding: 10px 4px; }
+            .day-cell { min-height: 80px; padding: 8px; }
+            .day-number { font-size: 15px; }
+            .festival-badge { font-size: 9px; }
+            .status-label { font-size: 11px; }
+            .btn { font-size: 15px; }
+            .modal { max-width: 500px; }
+        }
+
+        @media (min-width: 1024px) {
+            .container { padding: 20px; }
+            .control-panel { padding: 20px; }
+            .calendar-container { padding: 20px; }
+            .calendar-header { grid-template-columns: 80px repeat(7, 1fr); }
+            .week-row { grid-template-columns: 80px repeat(7, 1fr); }
+            .week-label { font-size: 12px; }
+            .day-cell { min-height: 100px; }
+            .day-cell:hover { 
+                box-shadow: 0 4px 8px rgba(0,0,0,0.12); 
+                transform: translateY(-2px); 
+            }
+            .unavailable-icon { font-size: 32px; }
+            .btn:hover { 
+                opacity: 0.9;
+                transform: scale(1.02);
+            }
+            .btn:active {
+                transform: scale(0.98);
+            }
+        }
+
+        @media (max-width: 374px) {
+            .navbar h1 { font-size: 16px; }
+            .month-display { font-size: 18px; min-width: 130px; }
+            .stats-grid { grid-template-columns: repeat(3, 1fr); }
+            .stat-label { font-size: 10px; }
+            .stat-value { font-size: 20px; }
+            .day-cell { min-height: 60px; padding: 4px; }
+            .day-number { font-size: 12px; }
+            .festival-badge { font-size: 7px; padding: 1px 3px; }
+            .status-label { font-size: 9px; }
+            .unavailable-icon { font-size: 20px; }
+            .btn { padding: 12px; font-size: 13px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="loading-screen" id="loadingScreen">
+        <div class="loading-spinner"></div>
+        <div style="margin-top: 20px; font-weight: 600; font-size: 14px;">正在載入假日資料...</div>
+    </div>
+
+    <div class="main-content" id="mainContent" style="display:none;">
+        <nav class="navbar">
+            <h1>📋 衡點-個人排班系統</h1>
+            <p id="staffName">請點選無法排班之日期</p>
+        </nav>
+
+        <div class="container">
+            <div class="control-panel">
+                <div class="month-selector">
+                    <button class="month-btn" onclick="previousMonth()">◀</button>
+                    <div class="month-display" id="monthDisplay">2025 年 11 月</div>
+                    <button class="month-btn" onclick="nextMonth()">▶</button>
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-card pink">
+                        <div class="stat-label">無法排班</div>
+                        <div class="stat-value" id="unavailableCount">0</div>
+                    </div>
+                    <div class="stat-card yellow">
+                        <div class="stat-label">國定假日</div>
+                        <div class="stat-value" id="holidayCount">0</div>
+                    </div>
+                    <div class="stat-card green">
+                        <div class="stat-label">可排班</div>
+                        <div class="stat-value" id="availableCount">0</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="calendar-container">
+                <div class="calendar">
+                    <div class="calendar-header">
+                        <div class="calendar-header-cell"></div>
+                        <div class="calendar-header-cell weekend">日</div>
+                        <div class="calendar-header-cell">一</div>
+                        <div class="calendar-header-cell">二</div>
+                        <div class="calendar-header-cell">三</div>
+                        <div class="calendar-header-cell">四</div>
+                        <div class="calendar-header-cell">五</div>
+                        <div class="calendar-header-cell weekend">六</div>
+                    </div>
+                    <div id="calendarBody"></div>
+                </div>
+            </div>
+
+            <div class="action-buttons">
+                <button class="btn btn-secondary" onclick="clearAll()">🗑️ 清除</button>
+                <button class="btn btn-primary" onclick="showConfirmModal()">✅ 送出</button>
+            </div>
+
+            <div class="info-card" style="margin-top: 15px;">
+                <h3>💡 使用說明</h3>
+                <ul>
+                    <li>點擊日期選擇「無法排班」的時段(午班/晚班)</li>
+                    <li>如果整天都無法排班,兩個時段都勾選即可</li>
+                    <li>完成後點擊「送出」按鈕</li>
+                </ul>
+            </div>
+
+            <div class="legend" style="margin-top: 10px;">
+                <h4>🎨 狀態說明</h4>
+                <div class="legend-grid">
+                    <div class="legend-item">
+                        <div class="legend-box available"></div>
+                        <span class="legend-label">可排班</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-box unavailable"></div>
+                        <span class="legend-label">無法排班</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-box weekend"></div>
+                        <span class="legend-label">週末</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-box holiday"></div>
+                        <span class="legend-label">假日</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-box workday"></div>
+                        <span class="legend-label">補班</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-box festival"></div>
+                        <span class="legend-label">節日</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 班別選擇對話框 -->
+    <div class="shift-modal" id="shiftModal">
+        <div class="shift-modal-content">
+            <div class="shift-modal-header">
+                ⏰ 選擇無法排班時段
+            </div>
+            <div class="shift-modal-date" id="shiftModalDate">
+                2025-11-15 (週五)
+            </div>
+            <div class="shift-options">
+                <div class="shift-option" id="allDayOption" onclick="toggleShiftOption('allDay')">
+                    <div class="shift-option-checkbox"></div>
+                    <div class="shift-option-label">
+                        <div class="shift-option-title">🚫 整天無法上班</div>
+                        <div class="shift-option-time">全天不可排班</div>
+                    </div>
+                </div>
+                <div class="shift-option" id="afternoonOption" onclick="toggleShiftOption('afternoon')">
+                    <div class="shift-option-checkbox"></div>
+                    <div class="shift-option-label">
+                        <div class="shift-option-title">🌤️ 午班</div>
+                        <div class="shift-option-time">12:00 - 18:00</div>
+                    </div>
+                </div>
+                <div class="shift-option" id="eveningOption" onclick="toggleShiftOption('evening')">
+                    <div class="shift-option-checkbox"></div>
+                    <div class="shift-option-label">
+                        <div class="shift-option-title">🌙 晚班</div>
+                        <div class="shift-option-time">18:00 - 22:00</div>
+                    </div>
+                </div>
+            </div>
+            <div class="shift-modal-buttons">
+                <button class="shift-modal-btn cancel" onclick="closeShiftModal()">取消</button>
+                <button class="shift-modal-btn confirm" onclick="confirmShiftSelection()">確認</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 確認對話框 -->
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal">
+            <div class="modal-header">
+                📋 確認送出
+            </div>
+            <div class="modal-content">
+                <div class="modal-summary" id="modalSummary">
+                    共選擇 0 天不可上班
+                </div>
+                <div class="date-list" id="dateList">
+                    <!-- 日期列表將由 JS 填充 -->
+                </div>
+            </div>
+            <div class="modal-buttons">
+                <button class="modal-btn modal-btn-cancel" onclick="closeConfirmModal()">取消</button>
+                <button class="modal-btn modal-btn-confirm" onclick="confirmSubmit()">確認送出</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+        const WEBHOOK_URL = 'https://hook.us2.make.com/rqr3jo7ph18ogb9qf0vkqxp73p398zs4';
+        
+        let currentYear = new Date().getFullYear();
+        let currentMonth = new Date().getMonth();
+        let holidays = [];
+        let festivals = [];
+        let unavailableDates = {}; // { 'YYYY-MM-DD': { allDay: true, afternoon: false, evening: false } }
+        let staffName = '';
+        let currentEditingDate = null;
+
+        const INTERNATIONAL_FESTIVALS = [
+            { month: 2, day: 14, name: '情人節', emoji: '💝' },
+            { month: 3, day: 8, name: '婦女節', emoji: '👩' },
+            { month: 3, day: 14, name: '白色情人節', emoji: '🤍' },
+            { month: 4, day: 1, name: '愚人節', emoji: '🤡' },
+            { month: 5, day: 1, name: '勞動節', emoji: '👷' },
+            { month: 7, day: 7, name: '七夕', emoji: '💕' },
+            { month: 8, day: 8, name: '父親節', emoji: '👨‍👦' },
+            { month: 9, day: 28, name: '教師節', emoji: '👨‍🏫' },
+            { month: 10, day: 31, name: '萬聖節', emoji: '🎃' },
+            { month: 12, day: 24, name: '平安夜', emoji: '🌙' },
+            { month: 12, day: 25, name: '聖誕節', emoji: '🎄' },
+            { month: 12, day: 31, name: '跨年', emoji: '🎆' }
+        ];
+
+        // 使用政府 API 抓取假日資料
+        async function fetchTaiwanHolidays(year) {
+            try {
+                console.log(`嘗試從政府API抓取 ${year} 年假日資料...`);
+                
+                const apiUrl = `https://data.gov.tw/api/v1/rest/datastore/A00000000J-000001-001`;
+                const params = new URLSearchParams({
+                    limit: 1000,
+                    filters: JSON.stringify({
+                        "西元日期": {
+                            "$like": `${year}%`
+                        }
+                    })
+                });
+                
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 10000);
+                
+                const response = await fetch(`${apiUrl}?${params}`, {
+                    method: 'GET',
+                    signal: controller.signal
+                });
+                
+                clearTimeout(timeoutId);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP 錯誤! 狀態: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                console.log('政府API回應:', data);
+                
+                if (data.success && data.result && data.result.records) {
+                    const records = data.result.records;
+                    const holidayMap = new Map();
+                    
+                    records.forEach(record => {
+                        const date = record['西元日期'];
+                        const dayType = record['是否放假']; // 2=放假, 1=補班, 0=正常上班
+                        const name = record['備註'] || '';
+                        
+                        if (date) {
+                            // 提取假日名稱
+                            let holidayName = name
+                                .replace(/放假之紀念日及節日日期/g, '')
+                                .replace(/調整放假日/g, '')
+                                .replace(/\(.*?\)/g, '')
+                                .trim();
+                            
+                            if (dayType === '2') {
+                                // 放假日
+                                if (!holidayName || holidayName === '') {
+                                    holidayName = '國定假日';
+                                }
+                                holidayMap.set(date, {
+                                    date: date,
+                                    name: holidayName,
+                                    isHoliday: true,
+                                    isWorkday: false
+                                });
+                            } else if (dayType === '1') {
+                                // 補班日
+                                holidayMap.set(date, {
+                                    date: date,
+                                    name: '補班日',
+                                    isHoliday: false,
+                                    isWorkday: true
+                                });
+                            }
+                        }
+                    });
+                    
+                    const result = Array.from(holidayMap.values());
+                    console.log(`✓ 從政府API載入假日資料成功: ${result.length} 筆資料`);
+                    return result;
+                }
+                
+                throw new Error('政府API回應格式錯誤');
+                
+            } catch (error) {
+                console.log('從政府API載入假日失敗,使用本地資料:', error.message);
+                return getLocalHolidays(year);
+            }
+        }
+
+        function getLocalHolidays(year) {
+            const h2025 = [
+                { date: '2025-01-01', name: '元旦', isHoliday: true },
+                { date: '2025-01-27', name: '補班日', isHoliday: false, isWorkday: true },
+                { date: '2025-01-28', name: '除夕', isHoliday: true },
+                { date: '2025-01-29', name: '春節', isHoliday: true },
+                { date: '2025-01-30', name: '春節', isHoliday: true },
+                { date: '2025-01-31', name: '春節', isHoliday: true },
+                { date: '2025-02-01', name: '春節', isHoliday: true },
+                { date: '2025-02-07', name: '補班日', isHoliday: false, isWorkday: true },
+                { date: '2025-02-28', name: '和平紀念日', isHoliday: true },
+                { date: '2025-04-03', name: '兒童節', isHoliday: true },
+                { date: '2025-04-04', name: '清明節', isHoliday: true },
+                { date: '2025-05-31', name: '端午節', isHoliday: true },
+                { date: '2025-06-02', name: '端午補假', isHoliday: true },
+                { date: '2025-10-10', name: '國慶日', isHoliday: true }
+            ];
+            
+            const h2026 = [
+                { date: '2026-01-01', name: '元旦', isHoliday: true },
+                { date: '2026-02-16', name: '除夕', isHoliday: true },
+                { date: '2026-02-17', name: '春節', isHoliday: true },
+                { date: '2026-02-18', name: '春節', isHoliday: true },
+                { date: '2026-02-19', name: '春節', isHoliday: true },
+                { date: '2026-02-20', name: '春節', isHoliday: true },
+                { date: '2026-02-28', name: '和平紀念日', isHoliday: true },
+                { date: '2026-04-03', name: '兒童節', isHoliday: true },
+                { date: '2026-04-04', name: '清明節', isHoliday: true },
+                { date: '2026-06-19', name: '端午節', isHoliday: true },
+                { date: '2026-10-10', name: '國慶日', isHoliday: true }
+            ];
+            
+            if (year === 2025) return h2025;
+            if (year === 2026) return h2026;
+            return [];
+        }
+
+        function generateFestivals(year) {
+            return INTERNATIONAL_FESTIVALS.map(f => ({
+                date: `${year}-${String(f.month).padStart(2, '0')}-${String(f.day).padStart(2, '0')}`,
+                name: f.name,
+                emoji: f.emoji
+            }));
+        }
+
+        window.onload = async function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            staffName = urlParams.get('name') || urlParams.get('staff') || '員工';
+            document.getElementById('staffName').innerHTML = `<span class="staff-name">${staffName}</span> 請點選無法排班之日期`;
+            
+            holidays = await fetchTaiwanHolidays(currentYear);
+            festivals = generateFestivals(currentYear);
+            loadUnavailability();
+            generateCalendar();
+            updateStats();
+            
+            document.getElementById('loadingScreen').classList.add('hidden');
+            document.getElementById('mainContent').style.display = 'block';
+        };
+
+        function generateCalendar() {
+            const firstDay = new Date(currentYear, currentMonth, 1);
+            const lastDay = new Date(currentYear, currentMonth + 1, 0);
+            document.getElementById('monthDisplay').textContent = `${currentYear} 年 ${currentMonth + 1} 月`;
+            
+            const firstDayOfWeek = firstDay.getDay();
+            const totalCells = Math.ceil((firstDayOfWeek + lastDay.getDate()) / 7) * 7;
+            const calendarDays = [];
+            let dayCounter = 1 - firstDayOfWeek;
+            
+            for (let i = 0; i < totalCells; i++) {
+                calendarDays.push(new Date(currentYear, currentMonth, dayCounter++));
+            }
+            
+            const body = document.getElementById('calendarBody');
+            body.innerHTML = '';
+            
+            for (let week = 0; week < calendarDays.length / 7; week++) {
+                const row = document.createElement('div');
+                row.className = 'week-row';
+                row.innerHTML = `<div class="week-label">W${week + 1}</div>`;
+                
+                for (let day = 0; day < 7; day++) {
+                    row.appendChild(createDayCell(calendarDays[week * 7 + day]));
+                }
+                
+                body.appendChild(row);
+            }
+        }
+
+        function createDayCell(date) {
+            const cell = document.createElement('div');
+            cell.className = 'day-cell';
+            
+            const isCurrentMonth = date.getMonth() === currentMonth;
+            const dayOfWeek = date.getDay();
+            const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+            const dateStr = formatDateISO(date);
+            const isToday = dateStr === formatDateISO(new Date());
+            const dayInfo = holidays.find(h => h.date === dateStr);
+            const festival = festivals.find(f => f.date === dateStr);
+            const unavailableShifts = unavailableDates[dateStr];
+            
+            if (!isCurrentMonth) cell.style.opacity = '0.5';
+            
+            const isHoliday = dayInfo?.isHoliday;
+            const isWorkday = dayInfo?.isWorkday;
+            
+            if (isHoliday) {
+                cell.classList.add('holiday');
+            } else if (isWorkday) {
+                cell.classList.add('workday');
+            } else if (isWeekend) {
+                cell.classList.add('weekend');
+            }
+            
+            if (festival && !isHoliday) {
+                cell.classList.add('festival');
+            }
+            
+            if (isToday) cell.classList.add('today');
+            if (unavailableShifts && (unavailableShifts.allDay || unavailableShifts.afternoon || unavailableShifts.evening)) {
+                cell.classList.add('unavailable');
+            }
+            
+            let html = '<div class="day-header">';
+            html += `<div class="day-number">${date.getDate()}</div>`;
+            
+            if (festival && !isHoliday) {
+                html += `<span class="festival-badge">${festival.emoji}${festival.name}</span>`;
+            }
+            html += '</div>';
+            
+            if (isHoliday) {
+                html += `<span class="status-label holiday-label">${dayInfo.name}</span>`;
+            } else if (isWorkday) {
+                html += `<span class="status-label workday-label">💼 ${dayInfo.name}</span>`;
+            } else if (isWeekend && !festival) {
+                html += `<span class="status-label weekend-label">休</span>`;
+            }
+            
+            // 顯示班別標籤
+            if (unavailableShifts) {
+                html += '<div class="shift-badges">';
+                if (unavailableShifts.allDay || (unavailableShifts.afternoon && unavailableShifts.evening)) {
+                    html += `<div class="unavailable-icon">🚫</div>`;
+                } else {
+                    if (unavailableShifts.afternoon) {
+                        html += '<span class="shift-badge afternoon">午班</span>';
+                    }
+                    if (unavailableShifts.evening) {
+                        html += '<span class="shift-badge evening">晚班</span>';
+                    }
+                }
+                html += '</div>';
+            }
+            
+            cell.innerHTML = html;
+            
+            // 所有日期都可以點擊(包含週末和假日)
+            if (isCurrentMonth) {
+                cell.onclick = () => openShiftModal(dateStr);
+            }
+            
+            return cell;
+        }
+
+        function openShiftModal(dateStr) {
+            currentEditingDate = dateStr;
+            const date = new Date(dateStr);
+            const dayOfWeek = ['日', '一', '二', '三', '四', '五', '六'][date.getDay()];
+            
+            document.getElementById('shiftModalDate').textContent = `${dateStr} (週${dayOfWeek})`;
+            
+            const shifts = unavailableDates[dateStr] || { allDay: false, afternoon: false, evening: false };
+            
+            document.getElementById('allDayOption').classList.toggle('selected', shifts.allDay);
+            document.getElementById('afternoonOption').classList.toggle('selected', shifts.afternoon);
+            document.getElementById('eveningOption').classList.toggle('selected', shifts.evening);
+            
+            document.getElementById('shiftModal').classList.add('show');
+        }
+
+        function closeShiftModal() {
+            document.getElementById('shiftModal').classList.remove('show');
+            currentEditingDate = null;
+        }
+
+        function toggleShiftOption(shift) {
+            const option = document.getElementById(shift + 'Option');
+            const wasSelected = option.classList.contains('selected');
+            
+            // 如果點擊「整天無法上班」
+            if (shift === 'allDay') {
+                if (!wasSelected) {
+                    // 選擇整天,取消其他選項
+                    document.getElementById('afternoonOption').classList.remove('selected');
+                    document.getElementById('eveningOption').classList.remove('selected');
+                }
+                option.classList.toggle('selected');
+            } else {
+                // 點擊午班或晚班,取消「整天無法上班」
+                document.getElementById('allDayOption').classList.remove('selected');
+                option.classList.toggle('selected');
+            }
+        }
+
+        function confirmShiftSelection() {
+            const allDaySelected = document.getElementById('allDayOption').classList.contains('selected');
+            const afternoonSelected = document.getElementById('afternoonOption').classList.contains('selected');
+            const eveningSelected = document.getElementById('eveningOption').classList.contains('selected');
+            
+            if (allDaySelected || afternoonSelected || eveningSelected) {
+                unavailableDates[currentEditingDate] = {
+                    allDay: allDaySelected,
+                    afternoon: afternoonSelected,
+                    evening: eveningSelected
+                };
+                
+                let msg = '✓ 已標記無法排班: ';
+                if (allDaySelected) {
+                    msg += '整天';
+                } else if (afternoonSelected && eveningSelected) {
+                    msg += '午班+晚班';
+                } else if (afternoonSelected) {
+                    msg += '午班';
+                } else {
+                    msg += '晚班';
+                }
+                showToast(msg);
+            } else {
+                delete unavailableDates[currentEditingDate];
+                showToast('✓ 已標記為可排班');
+            }
+            
+            closeShiftModal();
+            saveUnavailability();
+            generateCalendar();
+            updateStats();
+        }
+
+        function updateStats() {
+            const lastDay = new Date(currentYear, currentMonth + 1, 0);
+            let workDays = 0, holidayCount = 0, unavailableCount = 0;
+            
+            for (let d = 1; d <= lastDay.getDate(); d++) {
+                const date = new Date(currentYear, currentMonth, d);
+                const dateStr = formatDateISO(date);
+                const dayOfWeek = date.getDay();
+                const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+                const dayInfo = holidays.find(h => h.date === dateStr);
+                const isHoliday = dayInfo?.isHoliday;
+                const isWorkday = dayInfo?.isWorkday;
+                
+                if (isHoliday) {
+                    holidayCount++;
+                } else if (!isWeekend || isWorkday) {
+                    workDays++;
+                    const shifts = unavailableDates[dateStr];
+                    if (shifts && (shifts.allDay || shifts.afternoon || shifts.evening)) {
+                        unavailableCount++;
+                    }
+                }
+            }
+            
+            document.getElementById('unavailableCount').textContent = unavailableCount;
+            document.getElementById('holidayCount').textContent = holidayCount;
+            document.getElementById('availableCount').textContent = workDays - unavailableCount;
+        }
+
+        function previousMonth() {
+            currentMonth--;
+            if (currentMonth < 0) { 
+                currentMonth = 11; 
+                currentYear--; 
+                loadHolidaysForYear(); 
+            }
+            generateCalendar();
+            updateStats();
+        }
+
+        async function nextMonth() {
+            currentMonth++;
+            if (currentMonth > 11) { 
+                currentMonth = 0; 
+                currentYear++; 
+                await loadHolidaysForYear(); 
+            }
+            generateCalendar();
+            updateStats();
+        }
+
+        async function loadHolidaysForYear() {
+            holidays = await fetchTaiwanHolidays(currentYear);
+            festivals = generateFestivals(currentYear);
+        }
+
+        function saveUnavailability() {
+            localStorage.setItem(`unavailability_${staffName}`, JSON.stringify(unavailableDates));
+        }
+
+        function loadUnavailability() {
+            const saved = localStorage.getItem(`unavailability_${staffName}`);
+            if (saved) unavailableDates = JSON.parse(saved);
+        }
+
+        function clearAll() {
+            if (!confirm('確定要清除所有無法排班的標記嗎?')) return;
+            unavailableDates = {};
+            saveUnavailability();
+            generateCalendar();
+            updateStats();
+            showToast('🗑️ 已清除所有標記');
+        }
+
+        function showConfirmModal() {
+            const unavailableList = Object.keys(unavailableDates)
+                .sort()
+                .map(dateStr => {
+                    const date = new Date(dateStr);
+                    const dayOfWeek = ['日', '一', '二', '三', '四', '五', '六'][date.getDay()];
+                    const shifts = unavailableDates[dateStr];
+                    return { 
+                        date: dateStr, 
+                        dayOfWeek: dayOfWeek,
+                        shifts: shifts,
+                        display: `${dateStr} (週${dayOfWeek})`
+                    };
+                });
+
+            const modal = document.getElementById('modalOverlay');
+            const summary = document.getElementById('modalSummary');
+            const dateList = document.getElementById('dateList');
+            
+            if (unavailableList.length === 0) {
+                summary.textContent = '你沒有選擇任何無法排班的日期';
+                dateList.innerHTML = '<div style="text-align: center; padding: 20px; color: #718096;">這表示你所有平日都可以排班</div>';
+            } else {
+                summary.textContent = `共選擇 ${unavailableList.length} 天無法排班`;
+                dateList.innerHTML = unavailableList.map(item => {
+                    let shiftsHtml = '';
+                    if (item.shifts.allDay) {
+                        shiftsHtml = '<div class="date-item-shifts"><span class="shift-badge" style="background: var(--pink); color: white; border-color: var(--pink-dark);">整天無法上班</span></div>';
+                    } else if (item.shifts.afternoon && item.shifts.evening) {
+                        shiftsHtml = '<div class="date-item-shifts"><span class="shift-badge afternoon">午班</span><span class="shift-badge evening">晚班</span></div>';
+                    } else if (item.shifts.afternoon) {
+                        shiftsHtml = '<div class="date-item-shifts"><span class="shift-badge afternoon">午班</span></div>';
+                    } else if (item.shifts.evening) {
+                        shiftsHtml = '<div class="date-item-shifts"><span class="shift-badge evening">晚班</span></div>';
+                    }
+                    return `<div class="date-item">${item.display}${shiftsHtml}</div>`;
+                }).join('');
+            }
+            
+            modal.classList.add('show');
+        }
+
+        function closeConfirmModal() {
+            document.getElementById('modalOverlay').classList.remove('show');
+        }
+
+        async function confirmSubmit() {
+            closeConfirmModal();
+            
+            const unavailableList = Object.keys(unavailableDates)
+                .sort()
+                .map(dateStr => {
+                    const shifts = unavailableDates[dateStr];
+                    return {
+                        date: dateStr,
+                        dayOfWeek: ['日', '一', '二', '三', '四', '五', '六'][new Date(dateStr).getDay()],
+                        allDay: shifts.allDay || false,
+                        afternoon: shifts.afternoon || false,
+                        evening: shifts.evening || false
+                    };
+                });
+
+            const payload = {
+                action: 'submit_unavailability',
+                staffName: staffName,
+                timestamp: new Date().toISOString(),
+                unavailableDates: unavailableList,
+                totalUnavailable: unavailableList.length
+            };
+
+            console.log('發送資料:', payload);
+            showToast('📤 正在送出...');
+
+            try {
+                const response = await fetch(WEBHOOK_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                if (response.ok) {
+                    showToast(`✅ 已送出!共 ${unavailableList.length} 天無法排班`);
+                } else {
+                    showToast('⚠️ 送出失敗,請稍後再試');
+                }
+            } catch (error) {
+                console.error('送出錯誤:', error);
+                showToast('❌ 送出失敗,請檢查網路連線');
+            }
+        }
+
+        function formatDateISO(date) {
+            return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+        }
+
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+    </script>
+</body>
+</html>
