@@ -251,6 +251,7 @@
         .shift-option {
             display: flex; align-items: center; gap: 12px; padding: 12px;
             border: 2px solid #e9ecef; border-radius: 10px; cursor: pointer;
+            border-left-width: 5px;
         }
         .shift-option:active { transform: scale(0.98); }
         .shift-option.selected { border-color: var(--pink); background: var(--pink-light); }
@@ -263,7 +264,7 @@
         .shift-option-label { flex: 1; }
         .shift-option-title { font-size: 14px; font-weight: 600; margin-bottom: 2px; }
         .shift-option-time { font-size: 11px; color: var(--gray); }
-        .shift-option-color { width: 12px; height: 12px; border-radius: 3px; }
+        .shift-option-color { width: 20px; height: 20px; border-radius: 4px; flex-shrink: 0; }
         .shift-modal-buttons { display: flex; gap: 8px; }
         .shift-modal-btn {
             flex: 1; padding: 10px; border: none; border-radius: 8px;
@@ -341,12 +342,6 @@
         </nav>
 
         <div class="container">
-            <div class="api-setup" id="apiSetup" style="display:none;">
-                <h3>⚙️ 首次使用請設定 API</h3>
-                <input type="text" id="apiUrlInput" placeholder="貼上 API 網址">
-                <button class="btn btn-primary" onclick="saveApiConfig()">儲存設定</button>
-            </div>
-
             <div class="control-panel">
                 <div class="month-selector">
                     <button class="month-btn" onclick="previousMonth()">◀</button>
@@ -452,7 +447,9 @@
     <div class="toast" id="toast"></div>
 
     <script>
-        let API_URL = '';
+        // ============ 設定區 ============
+        const API_URL = 'https://script.google.com/macros/s/AKfycbwYXJ-tlMwjhlWoQEeJvIkU17Cw7fm0FiEXgKvHUc5fYP-fh1rSfDpw4QGH-KUdTJY/exec';
+        
         let currentYear = new Date().getFullYear();
         let currentMonth = new Date().getMonth();
         let holidays = [];
@@ -464,7 +461,6 @@
         window.onload = async function() {
             const urlParams = new URLSearchParams(window.location.search);
             staffName = urlParams.get('name') || urlParams.get('staff') || '';
-            API_URL = urlParams.get('api') || localStorage.getItem('personalApiUrl') || '';
             
             if (!staffName) {
                 document.getElementById('staffNameDisplay').innerHTML = '⚠️ 請從管理員提供的連結進入';
@@ -473,12 +469,7 @@
                     `<span class="staff-name">${staffName}</span> 請點選<strong>可以上班</strong>的日期`;
             }
             
-            if (!API_URL) {
-                document.getElementById('apiSetup').style.display = 'block';
-            } else {
-                await loadShifts();
-            }
-            
+            await loadShifts();
             holidays = await fetchHolidays(currentYear);
             loadLocalData();
             generateCalendar();
@@ -487,15 +478,6 @@
             document.getElementById('loadingScreen').classList.add('hidden');
             document.getElementById('mainContent').style.display = 'block';
         };
-
-        function saveApiConfig() {
-            API_URL = document.getElementById('apiUrlInput').value.trim();
-            if (!API_URL) { showToast('請輸入 API 網址'); return; }
-            localStorage.setItem('personalApiUrl', API_URL);
-            document.getElementById('apiSetup').style.display = 'none';
-            loadShifts();
-            showToast('✅ API 設定已儲存');
-        }
 
         async function loadShifts() {
             if (!API_URL) return;
@@ -513,38 +495,15 @@
 
         async function fetchHolidays(year) {
             // 透過 Apps Script 代理取得假日資料（避免 CORS）
-            if (API_URL) {
-                try {
-                    const res = await fetch(API_URL + '?action=getHolidays&year=' + year);
-                    const data = await res.json();
-                    if (data.success && data.holidays) {
-                        return data.holidays;
-                    }
-                } catch (e) {
-                    console.error('透過 API 載入假日失敗', e);
+            try {
+                const res = await fetch(API_URL + '?action=getHolidays&year=' + year);
+                const data = await res.json();
+                if (data.success && data.holidays) {
+                    console.log('已載入 ' + year + ' 年假日：', data.holidays.length + ' 筆');
+                    return data.holidays;
                 }
-            }
-            
-            // 備用：使用預設假日
-            return getDefaultHolidays(year);
-        }
-        
-        function getDefaultHolidays(year) {
-            if (year === 2025) {
-                return [
-                    { date: '2025-01-01', name: '元旦', isHoliday: true },
-                    { date: '2025-01-28', name: '春節', isHoliday: true },
-                    { date: '2025-01-29', name: '春節', isHoliday: true },
-                    { date: '2025-01-30', name: '春節', isHoliday: true },
-                    { date: '2025-01-31', name: '春節', isHoliday: true },
-                    { date: '2025-02-01', name: '春節', isHoliday: true },
-                    { date: '2025-02-28', name: '和平紀念日', isHoliday: true },
-                    { date: '2025-04-04', name: '清明節', isHoliday: true },
-                    { date: '2025-05-01', name: '勞動節', isHoliday: true },
-                    { date: '2025-05-31', name: '端午節', isHoliday: true },
-                    { date: '2025-10-06', name: '中秋節', isHoliday: true },
-                    { date: '2025-10-10', name: '國慶日', isHoliday: true }
-                ];
+            } catch (e) {
+                console.error('載入假日失敗', e);
             }
             return [];
         }
@@ -603,7 +562,7 @@
                 } else if (availData.shifts && availData.shifts.length > 0) {
                     availData.shifts.forEach(shiftId => {
                         const shift = shifts.find(s => s.id === shiftId);
-                        if (shift) html += `<span class="shift-badge">${shift.name}</span>`;
+                        if (shift) html += `<span class="shift-badge" style="background: ${shift.color}; color: white;">${shift.name}</span>`;
                     });
                 }
                 html += '</div>';
@@ -627,13 +586,13 @@
             `;
             shifts.forEach(shift => {
                 html += `
-                    <div class="shift-option" id="shift_${shift.id}_option" onclick="toggleShiftOption('${shift.id}')">
+                    <div class="shift-option" id="shift_${shift.id}_option" onclick="toggleShiftOption('${shift.id}')" style="border-left: 4px solid ${shift.color};">
                         <div class="shift-option-checkbox"></div>
                         <div class="shift-option-label">
                             <div class="shift-option-title">${shift.name}</div>
                             <div class="shift-option-time">${shift.time}</div>
                         </div>
-                        <div class="shift-option-color" style="background: ${shift.color};"></div>
+                        <div class="shift-option-color" style="background: ${shift.color}; width: 20px; height: 20px; border-radius: 4px;"></div>
                     </div>
                 `;
             });
@@ -783,20 +742,23 @@
 
         async function confirmSubmit() {
             closeConfirmModal();
-            if (!API_URL) { showToast('❌ 請先設定 API'); return; }
+            if (!API_URL) { showToast('❌ API 未設定'); return; }
             if (!staffName) { showToast('❌ 請從正確的連結進入'); return; }
             
-            let availabilityStr = '';
+            // 用換行分隔每個日期
+            let availabilityArr = [];
             Object.keys(availableDates).sort().forEach(dateStr => {
                 const data = availableDates[dateStr];
                 if (data && (data.allDay || (data.shifts && data.shifts.length > 0))) {
-                    if (data.allDay) availabilityStr += `${dateStr}(整天)`;
-                    else {
+                    if (data.allDay) {
+                        availabilityArr.push(`${dateStr}(整天)`);
+                    } else {
                         const shiftNames = data.shifts.map(id => shifts.find(s => s.id === id)?.name || id).join('+');
-                        availabilityStr += `${dateStr}(${shiftNames})`;
+                        availabilityArr.push(`${dateStr}(${shiftNames})`);
                     }
                 }
             });
+            const availabilityStr = availabilityArr.join('\n');
             
             showToast('📤 正在送出...');
             
