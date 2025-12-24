@@ -27,381 +27,113 @@
 
         .navbar {
             background: linear-gradient(135deg, var(--green), var(--green-dark));
-            color: white;
-            padding: 15px 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            color: white; padding: 15px 20px;
+            display: flex; justify-content: space-between; align-items: center;
             box-shadow: 0 2px 8px rgba(0,0,0,0.15);
         }
         .navbar h1 { font-size: 20px; }
-        .api-status {
-            font-size: 12px;
-            padding: 4px 10px;
-            border-radius: 12px;
-            background: rgba(255,255,255,0.2);
-        }
+        .api-status { font-size: 12px; padding: 4px 10px; border-radius: 12px; background: rgba(255,255,255,0.2); }
         .api-status.connected { background: rgba(255,255,255,0.3); }
         .api-status.disconnected { background: #e53e3e; }
 
-        .tabs {
-            display: flex;
-            background: white;
-            border-bottom: 2px solid #e0e0e0;
-            overflow-x: auto;
-        }
-        .tab {
-            padding: 12px 20px;
-            cursor: pointer;
-            font-weight: 600;
-            color: var(--gray);
-            border-bottom: 3px solid transparent;
-            white-space: nowrap;
-            transition: all 0.2s;
-        }
+        .tabs { display: flex; background: white; border-bottom: 2px solid #e0e0e0; overflow-x: auto; }
+        .tab { padding: 12px 20px; cursor: pointer; font-weight: 600; color: var(--gray); border-bottom: 3px solid transparent; white-space: nowrap; }
         .tab:hover { background: #f8f8f8; }
-        .tab.active {
-            color: var(--green);
-            border-bottom-color: var(--green);
-        }
+        .tab.active { color: var(--green); border-bottom-color: var(--green); }
 
         .tab-content { display: none; padding: 20px; }
         .tab-content.active { display: block; }
-
         .container { max-width: 1400px; margin: 0 auto; }
 
-        /* 設定面板 */
-        .settings-panel {
-            background: white;
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-        }
-        .settings-panel h3 {
-            font-size: 16px;
-            margin-bottom: 15px;
-            color: var(--green-dark);
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
+        .settings-panel { background: white; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+        .settings-panel h3 { font-size: 16px; margin-bottom: 15px; color: var(--green-dark); display: flex; align-items: center; gap: 8px; }
         
-        .api-config {
-            display: flex;
-            gap: 10px;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-        .api-config input {
-            flex: 1;
-            min-width: 300px;
-            padding: 10px 15px;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
-            font-size: 14px;
-        }
-        .api-config input:focus {
-            outline: none;
-            border-color: var(--green);
-        }
+        .api-config { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        .api-config input { flex: 1; min-width: 300px; padding: 10px 15px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; }
+        .api-config input:focus { outline: none; border-color: var(--green); }
 
-        /* 班別設定 */
-        .shift-list {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            margin-bottom: 15px;
-        }
-        .shift-item {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 12px;
-            background: #f8f9fa;
-            border-radius: 8px;
-        }
-        .shift-color {
-            width: 20px;
-            height: 20px;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-        .shift-item input {
-            padding: 8px 12px;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            font-size: 14px;
-        }
+        .shift-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px; }
+        .shift-item { display: flex; align-items: center; gap: 10px; padding: 12px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid; }
+        .shift-color-picker { width: 40px; height: 40px; border-radius: 8px; border: 2px solid #ddd; cursor: pointer; padding: 0; }
+        .shift-color-preview { width: 30px; height: 30px; border-radius: 6px; flex-shrink: 0; }
+        .shift-item input { padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
         .shift-item input.shift-name { width: 100px; }
         .shift-item input.shift-time { width: 140px; }
-        .shift-item .delete-btn {
-            padding: 6px 12px;
-            background: #fee2e2;
-            color: #dc2626;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 12px;
-        }
+        .shift-item .delete-btn { padding: 6px 12px; background: #fee2e2; color: #dc2626; border: none; border-radius: 6px; cursor: pointer; font-size: 12px; }
 
-        /* 員工列表 */
-        .staff-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 15px;
-        }
-        .staff-table th, .staff-table td {
-            padding: 12px;
-            text-align: left;
-            border-bottom: 1px solid #e0e0e0;
-        }
-        .staff-table th {
-            background: #f8f9fa;
-            font-weight: 600;
-            color: var(--green-dark);
-        }
-        .staff-table tr:hover {
-            background: #f8f9fa;
-        }
-        .staff-link {
-            color: var(--green);
-            text-decoration: none;
-            font-size: 12px;
-            word-break: break-all;
-        }
-        .copy-btn {
-            padding: 4px 10px;
-            background: var(--green-light);
-            color: var(--green-dark);
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 12px;
-            margin-left: 8px;
-        }
-        .availability-text {
-            font-size: 12px;
-            color: #666;
-            max-width: 300px;
-            word-break: break-all;
-        }
+        .staff-table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        .staff-table th, .staff-table td { padding: 12px; text-align: left; border-bottom: 1px solid #e0e0e0; }
+        .staff-table th { background: #f8f9fa; font-weight: 600; color: var(--green-dark); }
+        .staff-table tr:hover { background: #f8f9fa; }
+        .staff-link { color: var(--green); text-decoration: none; font-size: 12px; word-break: break-all; }
+        .copy-btn { padding: 4px 10px; background: var(--green-light); color: var(--green-dark); border: none; border-radius: 4px; cursor: pointer; font-size: 12px; margin-left: 8px; }
+        .availability-text { font-size: 12px; color: #666; max-width: 250px; word-break: break-all; }
 
-        /* 月曆 */
-        .month-selector {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-        .month-btn {
-            padding: 10px 15px;
-            border: none;
-            background: var(--green);
-            color: white;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 16px;
-        }
-        .month-display {
-            font-size: 22px;
-            font-weight: 700;
-            min-width: 180px;
-            text-align: center;
-        }
+        .calendar-controls { display: flex; align-items: center; gap: 15px; margin-bottom: 20px; flex-wrap: wrap; }
+        .month-selector { display: flex; align-items: center; gap: 10px; }
+        .month-btn { padding: 10px 15px; border: none; background: var(--green); color: white; border-radius: 8px; cursor: pointer; font-size: 16px; }
+        .month-display { font-size: 22px; font-weight: 700; min-width: 180px; text-align: center; }
+        .calendar-actions { display: flex; gap: 10px; margin-left: auto; }
 
-        .calendar-wrapper {
-            background: white;
-            border-radius: 12px;
-            padding: 20px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-            overflow-x: auto;
-        }
-        .calendar {
-            display: grid;
-            grid-template-columns: repeat(7, 1fr);
-            gap: 4px;
-            min-width: 700px;
-        }
-        .calendar-header {
-            padding: 10px;
-            text-align: center;
-            font-weight: 700;
-            background: var(--green-light);
-            border-radius: 6px;
-        }
+        .calendar-wrapper { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); overflow-x: auto; }
+        .calendar { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; min-width: 900px; }
+        .calendar-header { padding: 10px; text-align: center; font-weight: 700; background: var(--green-light); border-radius: 6px; }
         .calendar-header.weekend { background: var(--blue-light); }
 
-        .day-cell {
-            min-height: 100px;
-            padding: 8px;
-            background: white;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        .day-cell:hover {
-            border-color: var(--green);
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        }
+        .day-cell { min-height: 120px; padding: 8px; background: white; border: 2px solid #e0e0e0; border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+        .day-cell:hover { border-color: var(--green); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
         .day-cell.weekend { background: var(--blue-light); border-color: var(--blue); }
         .day-cell.holiday { background: var(--yellow-light); border-color: var(--yellow); }
         .day-cell.other-month { opacity: 0.4; }
-
-        .day-number {
-            font-weight: 700;
-            font-size: 14px;
-            margin-bottom: 6px;
-        }
-        .holiday-name {
-            font-size: 10px;
-            color: #b45309;
-            margin-bottom: 4px;
-        }
+        .day-number { font-weight: 700; font-size: 14px; margin-bottom: 6px; }
+        .holiday-name { font-size: 10px; color: #b45309; margin-bottom: 4px; }
         
-        .staff-availability {
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
-            margin-top: 4px;
-        }
-        .staff-avail-item {
-            font-size: 10px;
-            padding: 2px 6px;
-            border-radius: 3px;
-            display: flex;
-            align-items: center;
-            gap: 4px;
-        }
-        .staff-avail-item.available {
-            background: var(--green-light);
-            color: var(--green-dark);
-        }
-        .staff-avail-item .shifts-info {
-            font-size: 9px;
-            opacity: 0.8;
-        }
+        .staff-availability-list { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; max-height: 40px; overflow-y: auto; }
+        .staff-avail-item { font-size: 9px; padding: 2px 6px; border-radius: 3px; background: var(--green-light); color: var(--green-dark); display: flex; align-items: center; gap: 4px; }
+        .shift-dot { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
 
-        /* 按鈕 */
-        .btn {
-            padding: 10px 20px;
-            border: none;
-            border-radius: 8px;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s;
-            font-family: inherit;
-        }
-        .btn-primary {
-            background: var(--green);
-            color: white;
-        }
+        .schedule-list { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; }
+        .schedule-item { font-size: 10px; padding: 3px 6px; border-radius: 4px; color: white; font-weight: 600; }
+
+        .btn { padding: 10px 20px; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; }
+        .btn-primary { background: var(--green); color: white; }
         .btn-primary:hover { background: var(--green-dark); }
-        .btn-secondary {
-            background: #e0e0e0;
-            color: #333;
-        }
-        .btn-add {
-            background: var(--green-light);
-            color: var(--green-dark);
-            border: 2px dashed var(--green);
-        }
+        .btn-secondary { background: #e0e0e0; color: #333; }
+        .btn-add { background: var(--green-light); color: var(--green-dark); border: 2px dashed var(--green); }
+        .btn-export { background: var(--blue); color: white; }
+        .btn-save { background: var(--pink); color: white; }
 
-        /* Modal */
-        .modal-overlay {
-            display: none;
-            position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0,0,0,0.5);
-            z-index: 1000;
-            align-items: center;
-            justify-content: center;
-        }
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
         .modal-overlay.show { display: flex; }
-        .modal {
-            background: white;
-            border-radius: 16px;
-            padding: 24px;
-            max-width: 500px;
-            width: 90%;
-            max-height: 80vh;
-            overflow-y: auto;
-        }
-        .modal h3 {
-            font-size: 18px;
-            margin-bottom: 20px;
-            color: var(--green-dark);
-        }
-        .form-group {
-            margin-bottom: 15px;
-        }
-        .form-group label {
-            display: block;
-            font-weight: 600;
-            margin-bottom: 6px;
-            font-size: 14px;
-        }
-        .form-group input, .form-group select {
-            width: 100%;
-            padding: 10px 12px;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
-            font-size: 14px;
-        }
-        .form-group input:focus, .form-group select:focus {
-            outline: none;
-            border-color: var(--green);
-        }
-        .modal-buttons {
-            display: flex;
-            gap: 10px;
-            margin-top: 20px;
-        }
+        .modal { background: white; border-radius: 16px; padding: 24px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto; }
+        .modal h3 { font-size: 18px; margin-bottom: 20px; color: var(--green-dark); }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; font-weight: 600; margin-bottom: 6px; font-size: 14px; }
+        .form-group input, .form-group select { width: 100%; padding: 10px 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; }
+        .modal-buttons { display: flex; gap: 10px; margin-top: 20px; }
         .modal-buttons .btn { flex: 1; }
 
-        /* Toast */
-        .toast {
-            position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%) translateY(100px);
-            background: #333;
-            color: white;
-            padding: 12px 24px;
-            border-radius: 8px;
-            z-index: 2000;
-            transition: transform 0.3s;
-            font-weight: 500;
-        }
+        .schedule-modal-content { max-width: 600px; }
+        .schedule-date-header { font-size: 16px; color: var(--gray); margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid #e0e0e0; }
+        .staff-shift-grid { display: flex; flex-direction: column; gap: 8px; }
+        .staff-shift-row { display: flex; align-items: center; gap: 10px; padding: 10px; background: #f8f9fa; border-radius: 8px; flex-wrap: wrap; }
+        .staff-shift-row .staff-name { font-weight: 600; width: 80px; }
+        .staff-shift-row .shift-buttons { display: flex; gap: 6px; flex-wrap: wrap; }
+        .shift-toggle-btn { padding: 6px 12px; border: 2px solid; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600; background: white; }
+        .shift-toggle-btn.selected { color: white; }
+        .shift-toggle-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .overtime-input { width: 50px; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; }
+
+        .legend-bar { display: flex; gap: 15px; padding: 10px 15px; background: #f8f9fa; border-radius: 8px; margin-bottom: 15px; flex-wrap: wrap; }
+        .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+        .legend-color { width: 16px; height: 16px; border-radius: 4px; }
+
+        .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(100px); background: #333; color: white; padding: 12px 24px; border-radius: 8px; z-index: 2000; transition: transform 0.3s; font-weight: 500; }
         .toast.show { transform: translateX(-50%) translateY(0); }
 
-        /* Loading */
-        .loading {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 40px;
-            color: var(--gray);
-        }
-        .spinner {
-            width: 30px;
-            height: 30px;
-            border: 3px solid #e0e0e0;
-            border-top-color: var(--green);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin-right: 10px;
-        }
+        .loading { display: flex; align-items: center; justify-content: center; padding: 40px; color: var(--gray); }
+        .spinner { width: 30px; height: 30px; border: 3px solid #e0e0e0; border-top-color: var(--green); border-radius: 50%; animation: spin 1s linear infinite; margin-right: 10px; }
         @keyframes spin { to { transform: rotate(360deg); } }
-
-        @media (max-width: 768px) {
-            .navbar h1 { font-size: 16px; }
-            .tab { padding: 10px 15px; font-size: 14px; }
-            .settings-panel { padding: 15px; }
-            .api-config input { min-width: 200px; }
-        }
     </style>
 </head>
 <body>
@@ -411,99 +143,56 @@
     </nav>
 
     <div class="tabs">
-        <div class="tab active" onclick="switchTab('settings')">⚙️ 系統設定</div>
-        <div class="tab" onclick="switchTab('staff')">👥 員工管理</div>
+        <div class="tab active" onclick="switchTab('staff')">👥 員工管理</div>
         <div class="tab" onclick="switchTab('shifts')">🕐 班別設定</div>
         <div class="tab" onclick="switchTab('calendar')">📅 排班日曆</div>
     </div>
 
-    <!-- 系統設定 -->
-    <div class="tab-content active" id="tab-settings">
-        <div class="container">
-            <div class="settings-panel">
-                <h3>🔗 API 設定</h3>
-                <div class="api-config">
-                    <input type="text" id="apiUrl" placeholder="貼上 Apps Script 部署網址">
-                    <button class="btn btn-primary" onclick="saveApiUrl()">儲存並連線</button>
-                    <button class="btn btn-secondary" onclick="testApi()">測試連線</button>
-                </div>
-                <p style="font-size: 12px; color: #666; margin-top: 10px;">
-                    格式：https://script.google.com/macros/s/xxxxx/exec
-                </p>
-            </div>
-
-            <div class="settings-panel">
-                <h3>📖 使用說明</h3>
-                <ol style="padding-left: 20px; line-height: 2;">
-                    <li>先設定 API 網址並測試連線</li>
-                    <li>在「班別設定」新增班別（午班、晚班等）</li>
-                    <li>在「員工管理」新增員工，系統會自動產生連結</li>
-                    <li>把連結傳給員工，讓他們填寫可上班時間</li>
-                    <li>在「排班日曆」查看員工可上班狀況並排班</li>
-                </ol>
-            </div>
-        </div>
-    </div>
-
-    <!-- 員工管理 -->
-    <div class="tab-content" id="tab-staff">
+    <div class="tab-content active" id="tab-staff">
         <div class="container">
             <div class="settings-panel">
                 <h3>👥 員工列表</h3>
-                <button class="btn btn-add" onclick="showAddStaffModal()" style="margin-bottom: 15px;">
-                    ➕ 新增員工
-                </button>
-                <div id="staffListContainer">
-                    <div class="loading"><div class="spinner"></div>載入中...</div>
-                </div>
+                <button class="btn btn-add" onclick="showAddStaffModal()" style="margin-bottom: 15px;">➕ 新增員工</button>
+                <div id="staffListContainer"><div class="loading"><div class="spinner"></div>載入中...</div></div>
             </div>
         </div>
     </div>
 
-    <!-- 班別設定 -->
     <div class="tab-content" id="tab-shifts">
         <div class="container">
             <div class="settings-panel">
                 <h3>🕐 班別設定</h3>
-                <p style="font-size: 13px; color: #666; margin-bottom: 15px;">
-                    設定的班別會同步到員工的個人端
-                </p>
-                <div class="shift-list" id="shiftList">
-                    <div class="loading"><div class="spinner"></div>載入中...</div>
-                </div>
+                <p style="font-size: 13px; color: #666; margin-bottom: 15px;">設定班別顏色會顯示在日曆和個人端</p>
+                <div class="shift-list" id="shiftList"><div class="loading"><div class="spinner"></div>載入中...</div></div>
                 <button class="btn btn-add" onclick="addNewShift()">➕ 新增班別</button>
-                <div style="margin-top: 15px;">
-                    <button class="btn btn-primary" onclick="saveShifts()">💾 儲存班別設定</button>
-                </div>
+                <div style="margin-top: 15px;"><button class="btn btn-primary" onclick="saveShifts()">💾 儲存班別設定</button></div>
             </div>
         </div>
     </div>
 
-    <!-- 排班日曆 -->
     <div class="tab-content" id="tab-calendar">
         <div class="container">
-            <div class="month-selector">
-                <button class="month-btn" onclick="prevMonth()">◀</button>
-                <div class="month-display" id="monthDisplay">2025 年 1 月</div>
-                <button class="month-btn" onclick="nextMonth()">▶</button>
-                <button class="btn btn-secondary" onclick="refreshData()">🔄 重新整理</button>
-            </div>
-            <div class="calendar-wrapper">
-                <div class="calendar" id="calendarGrid">
-                    <!-- 由 JS 生成 -->
+            <div class="calendar-controls">
+                <div class="month-selector">
+                    <button class="month-btn" onclick="prevMonth()">◀</button>
+                    <div class="month-display" id="monthDisplay">2025 年 1 月</div>
+                    <button class="month-btn" onclick="nextMonth()">▶</button>
+                </div>
+                <div class="calendar-actions">
+                    <button class="btn btn-secondary" onclick="refreshData()">🔄 重新整理</button>
+                    <button class="btn btn-save" onclick="saveSchedule()">💾 儲存排班</button>
+                    <button class="btn btn-export" onclick="exportSchedule()">📤 匯出</button>
                 </div>
             </div>
+            <div class="legend-bar" id="legendBar"></div>
+            <div class="calendar-wrapper"><div class="calendar" id="calendarGrid"></div></div>
         </div>
     </div>
 
-    <!-- 新增員工 Modal -->
     <div class="modal-overlay" id="addStaffModal">
         <div class="modal">
             <h3>➕ 新增員工</h3>
-            <div class="form-group">
-                <label>員工姓名</label>
-                <input type="text" id="newStaffName" placeholder="請輸入姓名">
-            </div>
+            <div class="form-group"><label>員工姓名</label><input type="text" id="newStaffName" placeholder="請輸入姓名"></div>
             <div class="modal-buttons">
                 <button class="btn btn-secondary" onclick="closeModal('addStaffModal')">取消</button>
                 <button class="btn btn-primary" onclick="addStaff()">新增</button>
@@ -511,62 +200,42 @@
         </div>
     </div>
 
+    <div class="modal-overlay" id="scheduleModal">
+        <div class="modal schedule-modal-content">
+            <h3>📅 排班設定</h3>
+            <div class="schedule-date-header" id="scheduleDateHeader">2025-01-15 (週三)</div>
+            <div class="staff-shift-grid" id="staffShiftGrid"></div>
+            <div class="modal-buttons">
+                <button class="btn btn-secondary" onclick="closeModal('scheduleModal')">取消</button>
+                <button class="btn btn-primary" onclick="confirmSchedule()">確認排班</button>
+            </div>
+        </div>
+    </div>
+
     <div class="toast" id="toast"></div>
 
     <script>
-        // ============ 全域變數 ============
-        let API_URL = '';
+        // ============ 設定區 ============
+        const API_URL = 'https://script.google.com/macros/s/AKfycbwYXJ-tlMwjhlWoQEeJvIkU17Cw7fm0FiEXgKvHUc5fYP-fh1rSfDpw4QGH-KUdTJY/exec';
+        
         let staffList = [];
         let shifts = [];
         let currentYear = new Date().getFullYear();
         let currentMonth = new Date().getMonth();
         let holidays = [];
+        let schedule = {};
+        let currentEditingDate = null;
 
-        // ============ 初始化 ============
         window.onload = async function() {
-            // 載入 API URL
-            API_URL = localStorage.getItem('apiUrl') || '';
-            document.getElementById('apiUrl').value = API_URL;
-            
-            if (API_URL) {
-                await testApiConnection();
-                await loadAllData();
-            }
-            
-            // 載入假日
+            loadLocalSchedule();
+            await loadAllData();
             holidays = await fetchHolidays(currentYear);
             generateCalendar();
+            updateLegend();
+            updateApiStatus();
         };
-
-        // ============ Tab 切換 ============
-        function switchTab(tabId) {
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-            
-            event.target.classList.add('active');
-            document.getElementById('tab-' + tabId).classList.add('active');
-            
-            if (tabId === 'calendar') {
-                generateCalendar();
-            }
-        }
-
-        // ============ API 設定 ============
-        function saveApiUrl() {
-            API_URL = document.getElementById('apiUrl').value.trim();
-            localStorage.setItem('apiUrl', API_URL);
-            testApiConnection();
-        }
-
-        async function testApi() {
-            if (!API_URL) {
-                showToast('請先輸入 API 網址');
-                return;
-            }
-            await testApiConnection();
-        }
-
-        async function testApiConnection() {
+        
+        async function updateApiStatus() {
             const status = document.getElementById('apiStatus');
             try {
                 const res = await fetch(API_URL + '?action=getShifts');
@@ -575,273 +244,140 @@
                     status.textContent = '✓ 已連線';
                     status.classList.add('connected');
                     status.classList.remove('disconnected');
-                    showToast('✅ API 連線成功');
-                    await loadAllData();
-                    return true;
+                    return;
                 }
-            } catch (e) {
-                console.error(e);
-            }
+            } catch (e) {}
             status.textContent = '✗ 連線失敗';
             status.classList.add('disconnected');
             status.classList.remove('connected');
-            showToast('❌ API 連線失敗');
-            return false;
         }
 
-        async function loadAllData() {
-            await loadStaff();
-            await loadShifts();
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            document.getElementById('tab-' + tabId).classList.add('active');
+            if (tabId === 'calendar') { generateCalendar(); updateLegend(); }
         }
 
-        // ============ 員工管理 ============
+        async function loadAllData() { await loadStaff(); await loadShifts(); }
+
         async function loadStaff() {
             if (!API_URL) return;
-            
             try {
                 const res = await fetch(API_URL + '?action=getStaff');
                 const data = await res.json();
-                if (data.success) {
-                    staffList = data.staff;
-                    renderStaffList();
-                }
-            } catch (e) {
-                console.error('載入員工失敗', e);
-            }
+                if (data.success) { staffList = data.staff; renderStaffList(); }
+            } catch (e) { console.error('載入員工失敗', e); }
         }
 
         function renderStaffList() {
             const container = document.getElementById('staffListContainer');
-            
-            if (staffList.length === 0) {
-                container.innerHTML = '<p style="color: #666; padding: 20px;">尚無員工，請點擊「新增員工」</p>';
-                return;
-            }
-            
-            let html = `
-                <table class="staff-table">
-                    <thead>
-                        <tr>
-                            <th>姓名</th>
-                            <th>排班連結</th>
-                            <th>可上班時間</th>
-                            <th>總天數</th>
-                            <th>送出時間</th>
-                            <th>操作</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-            `;
-            
+            if (staffList.length === 0) { container.innerHTML = '<p style="color: #666; padding: 20px;">尚無員工</p>'; return; }
+            let html = `<table class="staff-table"><thead><tr><th>姓名</th><th>排班連結</th><th>可上班時間</th><th>總天數</th><th>送出時間</th><th>操作</th></tr></thead><tbody>`;
             staffList.forEach(staff => {
-                html += `
-                    <tr>
-                        <td><strong>${staff.name}</strong></td>
-                        <td>
-                            <a href="${staff.link}" target="_blank" class="staff-link">${staff.link}</a>
-                            <button class="copy-btn" onclick="copyLink('${staff.link}')">複製</button>
-                        </td>
-                        <td class="availability-text">${staff.availability || '尚未填寫'}</td>
-                        <td style="text-align: center; font-weight: 600; color: var(--green);">${staff.totalDays || 0}</td>
-                        <td style="font-size: 12px; color: #666;">${staff.submitTime || '-'}</td>
-                        <td>
-                            <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 12px;" 
-                                onclick="deleteStaff('${staff.name}')">刪除</button>
-                        </td>
-                    </tr>
-                `;
+                html += `<tr><td><strong>${staff.name}</strong></td>
+                    <td><a href="${staff.link}" target="_blank" class="staff-link">${staff.link}</a><button class="copy-btn" onclick="copyLink('${staff.link}')">複製</button></td>
+                    <td class="availability-text">${staff.availability || '尚未填寫'}</td>
+                    <td style="text-align:center;font-weight:600;color:var(--green);">${staff.totalDays || 0}</td>
+                    <td style="font-size:12px;color:#666;">${staff.submitTime || '-'}</td>
+                    <td><button class="btn btn-secondary" style="padding:6px 12px;font-size:12px;" onclick="deleteStaff('${staff.name}')">刪除</button></td></tr>`;
             });
-            
             html += '</tbody></table>';
             container.innerHTML = html;
         }
 
-        function showAddStaffModal() {
-            document.getElementById('newStaffName').value = '';
-            document.getElementById('addStaffModal').classList.add('show');
-        }
-
-        function closeModal(modalId) {
-            document.getElementById(modalId).classList.remove('show');
-        }
+        function showAddStaffModal() { document.getElementById('newStaffName').value = ''; document.getElementById('addStaffModal').classList.add('show'); }
+        function closeModal(modalId) { document.getElementById(modalId).classList.remove('show'); }
 
         async function addStaff() {
             const name = document.getElementById('newStaffName').value.trim();
-            if (!name) {
-                showToast('請輸入員工姓名');
-                return;
-            }
-            
-            if (!API_URL) {
-                showToast('請先設定 API');
-                return;
-            }
-            
+            if (!name) { showToast('請輸入員工姓名'); return; }
+            if (!API_URL) { showToast('請先設定 API'); return; }
             try {
-                // 使用 GET + URL 參數方式避免 CORS 問題
-                const payload = encodeURIComponent(JSON.stringify({ name: name }));
+                const payload = encodeURIComponent(JSON.stringify({ name }));
                 const res = await fetch(API_URL + '?action=addStaff&data=' + payload);
                 const data = await res.json();
-                
-                if (data.success) {
-                    showToast('✅ 員工已新增');
-                    closeModal('addStaffModal');
-                    await loadStaff();
-                } else {
-                    showToast('❌ ' + (data.error || '新增失敗'));
-                }
-            } catch (e) {
-                showToast('❌ 新增失敗');
-                console.error(e);
-            }
+                if (data.success) { showToast('✅ 員工已新增'); closeModal('addStaffModal'); await loadStaff(); }
+                else { showToast('❌ ' + (data.error || '新增失敗')); }
+            } catch (e) { showToast('❌ 新增失敗'); }
         }
 
         async function deleteStaff(name) {
-            if (!confirm(`確定要刪除員工「${name}」嗎？`)) return;
-            
+            if (!confirm(`確定要刪除「${name}」嗎？`)) return;
             try {
                 const res = await fetch(API_URL + '?action=deleteStaff&name=' + encodeURIComponent(name));
                 const data = await res.json();
-                
-                if (data.success) {
-                    showToast('✅ 員工已刪除');
-                    await loadStaff();
-                } else {
-                    showToast('❌ ' + (data.error || '刪除失敗'));
-                }
-            } catch (e) {
-                showToast('❌ 刪除失敗');
-            }
+                if (data.success) { showToast('✅ 員工已刪除'); await loadStaff(); }
+                else { showToast('❌ ' + (data.error || '刪除失敗')); }
+            } catch (e) { showToast('❌ 刪除失敗'); }
         }
 
-        function copyLink(link) {
-            navigator.clipboard.writeText(link).then(() => {
-                showToast('✅ 已複製連結');
-            });
-        }
+        function copyLink(link) { navigator.clipboard.writeText(link).then(() => showToast('✅ 已複製連結')); }
 
-        // ============ 班別設定 ============
         async function loadShifts() {
             if (!API_URL) return;
-            
             try {
                 const res = await fetch(API_URL + '?action=getShifts');
                 const data = await res.json();
-                if (data.success) {
-                    shifts = data.shifts;
-                    renderShiftList();
-                }
-            } catch (e) {
-                console.error('載入班別失敗', e);
-            }
+                if (data.success) { shifts = data.shifts; renderShiftList(); updateLegend(); }
+            } catch (e) { console.error('載入班別失敗', e); }
         }
 
         function renderShiftList() {
             const container = document.getElementById('shiftList');
-            
-            if (shifts.length === 0) {
-                container.innerHTML = '<p style="color: #666;">尚無班別設定</p>';
-                return;
-            }
-            
+            if (shifts.length === 0) { container.innerHTML = '<p style="color: #666;">尚無班別設定</p>'; return; }
             let html = '';
-            shifts.forEach((shift, index) => {
-                html += `
-                    <div class="shift-item" data-index="${index}">
-                        <input type="color" class="shift-color" value="${shift.color}" 
-                            onchange="updateShiftColor(${index}, this.value)">
-                        <input type="text" class="shift-name" value="${shift.name}" 
-                            placeholder="班別名稱" onchange="updateShiftName(${index}, this.value)">
-                        <input type="text" class="shift-time" value="${shift.time}" 
-                            placeholder="時段 (如 12:00-18:00)" onchange="updateShiftTime(${index}, this.value)">
-                        <button class="delete-btn" onclick="deleteShift(${index})">刪除</button>
-                    </div>
-                `;
+            shifts.forEach((shift, i) => {
+                html += `<div class="shift-item" style="border-left-color: ${shift.color};">
+                    <input type="color" class="shift-color-picker" value="${shift.color}" onchange="updateShiftColor(${i}, this.value)">
+                    <div class="shift-color-preview" style="background: ${shift.color};"></div>
+                    <input type="text" class="shift-name" value="${shift.name}" onchange="updateShiftName(${i}, this.value)">
+                    <input type="text" class="shift-time" value="${shift.time}" onchange="updateShiftTime(${i}, this.value)">
+                    <button class="delete-btn" onclick="deleteShift(${i})">刪除</button>
+                </div>`;
             });
-            
             container.innerHTML = html;
         }
 
         function addNewShift() {
-            const newId = 'shift' + (shifts.length + 1);
-            shifts.push({
-                id: newId,
-                name: '新班別',
-                time: '00:00-00:00',
-                color: '#9fcccc'
-            });
+            const colors = ['#9fcccc', '#a78bfa', '#f2ac98', '#7ac19a', '#ffe08b', '#f472b6'];
+            shifts.push({ id: 'shift' + (shifts.length + 1), name: '新班別', time: '00:00-00:00', color: colors[shifts.length % colors.length] });
             renderShiftList();
         }
 
-        function updateShiftColor(index, value) { shifts[index].color = value; }
-        function updateShiftName(index, value) { shifts[index].name = value; }
-        function updateShiftTime(index, value) { shifts[index].time = value; }
-
-        function deleteShift(index) {
-            if (!confirm('確定要刪除此班別嗎？')) return;
-            shifts.splice(index, 1);
-            renderShiftList();
-        }
+        function updateShiftColor(i, v) { shifts[i].color = v; renderShiftList(); }
+        function updateShiftName(i, v) { shifts[i].name = v; }
+        function updateShiftTime(i, v) { shifts[i].time = v; }
+        function deleteShift(i) { if (confirm('確定刪除？')) { shifts.splice(i, 1); renderShiftList(); } }
 
         async function saveShifts() {
-            if (!API_URL) {
-                showToast('請先設定 API');
-                return;
-            }
-            
+            if (!API_URL) { showToast('請先設定 API'); return; }
             try {
-                // 使用 GET + URL 參數方式避免 CORS 問題
                 const payload = encodeURIComponent(JSON.stringify(shifts));
                 const res = await fetch(API_URL + '?action=saveShifts&data=' + payload);
                 const data = await res.json();
-                
-                if (data.success) {
-                    showToast('✅ 班別設定已儲存');
-                } else {
-                    showToast('❌ 儲存失敗');
-                }
-            } catch (e) {
-                showToast('❌ 儲存失敗');
-                console.error(e);
-            }
+                if (data.success) { showToast('✅ 班別已儲存'); updateLegend(); }
+                else { showToast('❌ 儲存失敗'); }
+            } catch (e) { showToast('❌ 儲存失敗'); }
         }
 
-        // ============ 日曆 ============
-        async function fetchHolidays(year) {
-            // 透過 Apps Script 代理取得假日資料（避免 CORS）
-            if (API_URL) {
-                try {
-                    const res = await fetch(API_URL + '?action=getHolidays&year=' + year);
-                    const data = await res.json();
-                    if (data.success && data.holidays) {
-                        return data.holidays;
-                    }
-                } catch (e) {
-                    console.error('透過 API 載入假日失敗', e);
-                }
-            }
-            
-            // 備用：使用預設假日
-            return getDefaultHolidays(year);
+        function updateLegend() {
+            let html = `<div class="legend-item"><div class="legend-color" style="background: var(--green-light); border: 1px solid var(--green);"></div><span>可上班</span></div>`;
+            shifts.forEach(s => { html += `<div class="legend-item"><div class="legend-color" style="background: ${s.color};"></div><span>${s.name}</span></div>`; });
+            document.getElementById('legendBar').innerHTML = html;
         }
-        
-        function getDefaultHolidays(year) {
-            // 2025 年預設假日
-            if (year === 2025) {
-                return [
-                    { date: '2025-01-01', name: '元旦', isHoliday: true },
-                    { date: '2025-01-28', name: '春節', isHoliday: true },
-                    { date: '2025-01-29', name: '春節', isHoliday: true },
-                    { date: '2025-01-30', name: '春節', isHoliday: true },
-                    { date: '2025-01-31', name: '春節', isHoliday: true },
-                    { date: '2025-02-01', name: '春節', isHoliday: true },
-                    { date: '2025-02-28', name: '和平紀念日', isHoliday: true },
-                    { date: '2025-04-04', name: '清明節', isHoliday: true },
-                    { date: '2025-05-01', name: '勞動節', isHoliday: true },
-                    { date: '2025-05-31', name: '端午節', isHoliday: true },
-                    { date: '2025-10-06', name: '中秋節', isHoliday: true },
-                    { date: '2025-10-10', name: '國慶日', isHoliday: true }
-                ];
+
+        async function fetchHolidays(year) {
+            try {
+                const res = await fetch(API_URL + '?action=getHolidays&year=' + year);
+                const data = await res.json();
+                if (data.success && data.holidays) {
+                    console.log('已載入 ' + year + ' 年假日：', data.holidays.length + ' 筆');
+                    return data.holidays;
+                }
+            } catch (e) {
+                console.error('載入假日失敗', e);
             }
             return [];
         }
@@ -849,24 +385,16 @@
         function generateCalendar() {
             const grid = document.getElementById('calendarGrid');
             document.getElementById('monthDisplay').textContent = `${currentYear} 年 ${currentMonth + 1} 月`;
-            
             const dayNames = ['日', '一', '二', '三', '四', '五', '六'];
-            let html = dayNames.map((d, i) => 
-                `<div class="calendar-header ${i === 0 || i === 6 ? 'weekend' : ''}">${d}</div>`
-            ).join('');
+            let html = dayNames.map((d, i) => `<div class="calendar-header ${i === 0 || i === 6 ? 'weekend' : ''}">${d}</div>`).join('');
             
             const firstDay = new Date(currentYear, currentMonth, 1);
             const lastDay = new Date(currentYear, currentMonth + 1, 0);
             const startDay = firstDay.getDay();
-            
-            // 上個月的日期
             const prevMonthLast = new Date(currentYear, currentMonth, 0);
-            for (let i = startDay - 1; i >= 0; i--) {
-                const day = prevMonthLast.getDate() - i;
-                html += `<div class="day-cell other-month"><div class="day-number">${day}</div></div>`;
-            }
             
-            // 本月日期
+            for (let i = startDay - 1; i >= 0; i--) html += `<div class="day-cell other-month"><div class="day-number">${prevMonthLast.getDate() - i}</div></div>`;
+            
             for (let day = 1; day <= lastDay.getDate(); day++) {
                 const date = new Date(currentYear, currentMonth, day);
                 const dateStr = formatDate(date);
@@ -878,92 +406,139 @@
                 if (isWeekend) classes += ' weekend';
                 if (holidayInfo) classes += ' holiday';
                 
-                html += `<div class="${classes}" onclick="showDayDetail('${dateStr}')">`;
+                html += `<div class="${classes}" onclick="openScheduleModal('${dateStr}')">`;
                 html += `<div class="day-number">${day}</div>`;
-                if (holidayInfo) {
-                    html += `<div class="holiday-name">${holidayInfo.name}</div>`;
-                }
+                if (holidayInfo) html += `<div class="holiday-name">${holidayInfo.name}</div>`;
                 
-                // 顯示該日可上班的員工
-                html += '<div class="staff-availability">';
+                html += '<div class="staff-availability-list">';
                 staffList.forEach(staff => {
                     if (staff.availability && staff.availability.includes(dateStr)) {
-                        // 解析該日的班別資訊
                         const match = staff.availability.match(new RegExp(dateStr + '\\(([^)]+)\\)'));
-                        const shiftInfo = match ? match[1] : '';
-                        html += `<div class="staff-avail-item available">
-                            <span>${staff.name}</span>
-                            <span class="shifts-info">${shiftInfo}</span>
-                        </div>`;
+                        const shiftInfo = match ? match[1] : '整天';
+                        html += `<div class="staff-avail-item"><span>${staff.name}</span><span>${renderShiftDots(shiftInfo)}</span></div>`;
                     }
                 });
                 html += '</div>';
                 
+                if (schedule[dateStr] && schedule[dateStr].length > 0) {
+                    html += '<div class="schedule-list">';
+                    schedule[dateStr].forEach(item => {
+                        const shift = shifts.find(s => s.id === item.shiftId);
+                        const color = shift ? shift.color : '#999';
+                        const shiftName = shift ? shift.name : item.shiftId;
+                        html += `<div class="schedule-item" style="background: ${color};">${item.staffName} - ${shiftName}${item.overtime ? ` +${item.overtime}h` : ''}</div>`;
+                    });
+                    html += '</div>';
+                }
                 html += '</div>';
             }
             
-            // 下個月的日期
             const remainingDays = (7 - (startDay + lastDay.getDate()) % 7) % 7;
-            for (let day = 1; day <= remainingDays; day++) {
-                html += `<div class="day-cell other-month"><div class="day-number">${day}</div></div>`;
-            }
-            
+            for (let day = 1; day <= remainingDays; day++) html += `<div class="day-cell other-month"><div class="day-number">${day}</div></div>`;
             grid.innerHTML = html;
         }
 
-        function prevMonth() {
-            currentMonth--;
-            if (currentMonth < 0) {
-                currentMonth = 11;
-                currentYear--;
-                fetchHolidays(currentYear).then(h => { holidays = h; generateCalendar(); });
-            } else {
-                generateCalendar();
-            }
+        function renderShiftDots(shiftInfo) {
+            if (shiftInfo === '整天') return shifts.map(s => `<span class="shift-dot" style="background:${s.color};" title="${s.name}"></span>`).join('');
+            return shiftInfo.split('+').map(name => {
+                const shift = shifts.find(s => s.name === name);
+                return `<span class="shift-dot" style="background:${shift ? shift.color : '#999'};" title="${name}"></span>`;
+            }).join('');
         }
 
-        function nextMonth() {
-            currentMonth++;
-            if (currentMonth > 11) {
-                currentMonth = 0;
-                currentYear++;
-                fetchHolidays(currentYear).then(h => { holidays = h; generateCalendar(); });
-            } else {
-                generateCalendar();
-            }
-        }
-
-        async function refreshData() {
-            showToast('🔄 重新整理中...');
-            await loadAllData();
-            generateCalendar();
-            showToast('✅ 資料已更新');
-        }
-
-        function showDayDetail(dateStr) {
-            // 可以之後擴充：點日期顯示詳細資訊或直接排班
+        function openScheduleModal(dateStr) {
+            currentEditingDate = dateStr;
+            const date = new Date(dateStr);
+            const dayOfWeek = ['日', '一', '二', '三', '四', '五', '六'][date.getDay()];
+            document.getElementById('scheduleDateHeader').textContent = `${dateStr} (週${dayOfWeek})`;
+            
             const availableStaff = staffList.filter(s => s.availability && s.availability.includes(dateStr));
-            if (availableStaff.length === 0) {
-                showToast(`${dateStr} 沒有員工可上班`);
-            } else {
-                const names = availableStaff.map(s => s.name).join('、');
-                showToast(`${dateStr} 可上班：${names}`);
+            const daySchedule = schedule[dateStr] || [];
+            const grid = document.getElementById('staffShiftGrid');
+            
+            if (availableStaff.length === 0) { grid.innerHTML = '<p style="color:#666;padding:10px;">該日沒有員工可上班</p>'; }
+            else {
+                let html = '';
+                availableStaff.forEach(staff => {
+                    const match = staff.availability.match(new RegExp(dateStr + '\\(([^)]+)\\)'));
+                    const availInfo = match ? match[1] : '整天';
+                    const canAllDay = availInfo === '整天';
+                    const availNames = canAllDay ? shifts.map(s => s.name) : availInfo.split('+');
+                    const staffSched = daySchedule.find(s => s.staffName === staff.name);
+                    
+                    html += `<div class="staff-shift-row" data-staff="${staff.name}"><span class="staff-name">${staff.name}</span><div class="shift-buttons">`;
+                    shifts.forEach(shift => {
+                        const canWork = canAllDay || availNames.includes(shift.name);
+                        const isSelected = staffSched && staffSched.shiftId === shift.id;
+                        html += `<button class="shift-toggle-btn ${isSelected ? 'selected' : ''}" 
+                            style="border-color:${shift.color};${isSelected ? 'background:' + shift.color : ''}"
+                            data-shift-id="${shift.id}" data-staff="${staff.name}" ${canWork ? '' : 'disabled'}
+                            onclick="toggleShiftBtn(this,'${shift.color}')">${shift.name}</button>`;
+                    });
+                    html += `</div><input type="number" class="overtime-input" data-staff="${staff.name}" value="${staffSched ? staffSched.overtime : 0}" min="0" max="8"><span style="font-size:11px;color:#666;">h</span></div>`;
+                });
+                grid.innerHTML = html;
             }
+            document.getElementById('scheduleModal').classList.add('show');
         }
 
-        function formatDate(date) {
-            const y = date.getFullYear();
-            const m = String(date.getMonth() + 1).padStart(2, '0');
-            const d = String(date.getDate()).padStart(2, '0');
-            return `${y}-${m}-${d}`;
+        function toggleShiftBtn(btn, color) {
+            const row = btn.closest('.staff-shift-row');
+            row.querySelectorAll('.shift-toggle-btn').forEach(b => { b.classList.remove('selected'); b.style.background = 'white'; });
+            btn.classList.add('selected');
+            btn.style.background = color;
         }
 
-        function showToast(msg) {
-            const toast = document.getElementById('toast');
-            toast.textContent = msg;
-            toast.classList.add('show');
-            setTimeout(() => toast.classList.remove('show'), 3000);
+        function confirmSchedule() {
+            const rows = document.querySelectorAll('#staffShiftGrid .staff-shift-row');
+            const daySchedule = [];
+            rows.forEach(row => {
+                const staffName = row.dataset.staff;
+                const selectedBtn = row.querySelector('.shift-toggle-btn.selected');
+                const overtime = parseInt(row.querySelector('.overtime-input').value) || 0;
+                if (selectedBtn) daySchedule.push({ staffName, shiftId: selectedBtn.dataset.shiftId, overtime });
+            });
+            schedule[currentEditingDate] = daySchedule;
+            saveLocalSchedule();
+            closeModal('scheduleModal');
+            generateCalendar();
+            showToast('✅ 已更新排班');
         }
+
+        function saveLocalSchedule() { localStorage.setItem('schedule', JSON.stringify(schedule)); }
+        function loadLocalSchedule() { const saved = localStorage.getItem('schedule'); if (saved) schedule = JSON.parse(saved); }
+        function saveSchedule() { saveLocalSchedule(); showToast('💾 排班已儲存'); }
+
+        async function exportSchedule() {
+            if (!API_URL) { showToast('請先設定 API'); return; }
+            const exportData = [];
+            const lastDay = new Date(currentYear, currentMonth + 1, 0);
+            for (let day = 1; day <= lastDay.getDate(); day++) {
+                const date = new Date(currentYear, currentMonth, day);
+                const dateStr = formatDate(date);
+                const dayOfWeek = ['日', '一', '二', '三', '四', '五', '六'][date.getDay()];
+                const holidayInfo = holidays.find(h => h.date === dateStr);
+                const daySchedule = schedule[dateStr] || [];
+                daySchedule.forEach((item, idx) => {
+                    const shift = shifts.find(s => s.id === item.shiftId);
+                    exportData.push({ date: dateStr, dayOfWeek, holiday: holidayInfo?.name || '', staffName: item.staffName, shiftName: shift?.name || '', shiftTime: shift?.time || '', overtime: item.overtime || 0, isFirst: idx === 0 });
+                });
+            }
+            if (exportData.length === 0) { showToast('沒有排班資料'); return; }
+            try {
+                const payload = encodeURIComponent(JSON.stringify({ year: currentYear, month: currentMonth + 1, data: exportData }));
+                const res = await fetch(API_URL + '?action=exportSchedule&data=' + payload);
+                const data = await res.json();
+                showToast(data.success ? '✅ 已匯出到 Sheets' : '❌ 匯出失敗');
+            } catch (e) { showToast('❌ 匯出失敗'); }
+        }
+
+        function prevMonth() { currentMonth--; if (currentMonth < 0) { currentMonth = 11; currentYear--; fetchHolidays(currentYear).then(h => { holidays = h; generateCalendar(); }); } else generateCalendar(); }
+        function nextMonth() { currentMonth++; if (currentMonth > 11) { currentMonth = 0; currentYear++; fetchHolidays(currentYear).then(h => { holidays = h; generateCalendar(); }); } else generateCalendar(); }
+        async function refreshData() { showToast('🔄 重新整理...'); await loadAllData(); holidays = await fetchHolidays(currentYear); generateCalendar(); showToast('✅ 已更新'); }
+
+        function formatDate(date) { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`; }
+        function showToast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 3000); }
     </script>
 </body>
 </html>
