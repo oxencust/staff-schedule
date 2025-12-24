@@ -114,19 +114,41 @@
         .modal-buttons .btn { flex: 1; }
 
         .schedule-modal-content { max-width: 600px; }
-        .schedule-date-header { font-size: 16px; color: var(--gray); margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid #e0e0e0; }
-        .staff-shift-grid { display: flex; flex-direction: column; gap: 8px; }
-        .staff-shift-row { display: flex; align-items: center; gap: 10px; padding: 10px; background: #f8f9fa; border-radius: 8px; flex-wrap: wrap; }
-        .staff-shift-row .staff-name { font-weight: 600; width: 80px; }
-        .staff-shift-row .shift-buttons { display: flex; gap: 6px; flex-wrap: wrap; }
-        .shift-toggle-btn { padding: 6px 12px; border: 2px solid; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600; background: white; }
-        .shift-toggle-btn.selected { color: white; }
-        .shift-toggle-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-        .overtime-input { width: 50px; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; }
+        .schedule-date-header { font-size: 16px; color: var(--gray); margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #e0e0e0; }
+        .staff-shift-grid { display: flex; flex-direction: column; gap: 8px; max-height: 50vh; overflow-y: auto; }
 
         .legend-bar { display: flex; gap: 15px; padding: 10px 15px; background: #f8f9fa; border-radius: 8px; margin-bottom: 15px; flex-wrap: wrap; }
         .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; }
         .legend-color { width: 16px; height: 16px; border-radius: 4px; }
+
+        .schedule-legend { display: flex; gap: 10px; margin-bottom: 15px; }
+        .legend-tag { font-size: 11px; padding: 3px 8px; border-radius: 4px; }
+        .legend-tag.available { background: var(--green-light); color: var(--green-dark); }
+        .legend-tag.unavailable { background: #f3f4f6; color: #6b7280; }
+
+        .staff-shift-row { display: flex; align-items: center; gap: 10px; padding: 10px; background: #f8f9fa; border-radius: 8px; flex-wrap: wrap; border-left: 4px solid #e0e0e0; }
+        .staff-shift-row.can-work { border-left-color: var(--green); background: var(--green-light); }
+        .staff-shift-row .staff-info { display: flex; align-items: center; gap: 8px; min-width: 100px; }
+        .staff-shift-row .staff-name { font-weight: 600; font-size: 14px; }
+        .staff-shift-row .staff-status { font-size: 10px; padding: 2px 6px; border-radius: 3px; }
+        .staff-shift-row .staff-status.available { background: var(--green); color: white; }
+        .staff-shift-row .staff-status.unavailable { background: #d1d5db; color: #6b7280; }
+        .staff-shift-row .avail-shifts-info { font-size: 10px; color: var(--green-dark); margin-left: auto; }
+        .staff-shift-row .shift-buttons { display: flex; gap: 6px; flex-wrap: wrap; flex: 1; }
+        .staff-shift-row .controls { display: flex; align-items: center; gap: 6px; }
+
+        .shift-toggle-btn { padding: 6px 10px; border: 2px solid; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: 600; background: white; transition: all 0.15s; }
+        .shift-toggle-btn:hover:not(:disabled) { opacity: 0.8; }
+        .shift-toggle-btn.selected { color: white; }
+        .shift-toggle-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .shift-toggle-btn.no-schedule { border-color: #9ca3af; color: #6b7280; }
+        .shift-toggle-btn.no-schedule.selected { background: #9ca3af; color: white; }
+
+        .overtime-input { width: 50px; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; }
+        .note-input { width: 80px; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 11px; }
+
+        .schedule-item-full { font-size: 9px; padding: 3px 5px; border-radius: 4px; color: white; font-weight: 500; margin-top: 1px; line-height: 1.3; }
+        .schedule-item-full .time { opacity: 0.9; font-size: 8px; }
 
         .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(100px); background: #333; color: white; padding: 12px 24px; border-radius: 8px; z-index: 2000; transition: transform 0.3s; font-weight: 500; }
         .toast.show { transform: translateX(-50%) translateY(0); }
@@ -134,6 +156,88 @@
         .loading { display: flex; align-items: center; justify-content: center; padding: 40px; color: var(--gray); }
         .spinner { width: 30px; height: 30px; border: 3px solid #e0e0e0; border-top-color: var(--green); border-radius: 50%; animation: spin 1s linear infinite; margin-right: 10px; }
         @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ========== 手機版優化 ========== */
+        @media (max-width: 768px) {
+            .navbar { padding: 12px 15px; }
+            .navbar h1 { font-size: 16px; }
+            
+            .tabs { gap: 0; }
+            .tab { padding: 10px 12px; font-size: 13px; flex: 1; text-align: center; }
+            
+            .tab-content { padding: 12px; }
+            .settings-panel { padding: 15px; border-radius: 10px; }
+            
+            /* 員工表格手機版 */
+            .staff-table { font-size: 13px; }
+            .staff-table th, .staff-table td { padding: 8px 6px; }
+            .staff-table thead { display: none; }
+            .staff-table tr { display: block; margin-bottom: 15px; border: 1px solid #e0e0e0; border-radius: 8px; padding: 10px; }
+            .staff-table td { display: flex; justify-content: space-between; align-items: center; border: none; padding: 6px 0; }
+            .staff-table td::before { content: attr(data-label); font-weight: 600; color: var(--green-dark); margin-right: 10px; }
+            .staff-link { font-size: 11px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
+            .availability-text { max-width: 100%; font-size: 11px; }
+            
+            /* 班別設定手機版 */
+            .shift-item { flex-wrap: wrap; padding: 10px; }
+            .shift-item input.shift-name { width: 80px; }
+            .shift-item input.shift-time { width: 110px; }
+            .shift-color-picker { width: 35px; height: 35px; }
+            
+            /* 日曆控制列 */
+            .calendar-controls { flex-direction: column; gap: 10px; }
+            .month-selector { width: 100%; justify-content: center; }
+            .month-display { font-size: 18px; min-width: 140px; }
+            .calendar-actions { width: 100%; justify-content: center; flex-wrap: wrap; }
+            .calendar-actions .btn { padding: 8px 12px; font-size: 12px; }
+            
+            /* 日曆手機版 */
+            .calendar-wrapper { padding: 10px; border-radius: 10px; }
+            .calendar { min-width: 100%; gap: 2px; }
+            .calendar-header { padding: 6px 2px; font-size: 12px; }
+            .day-cell { min-height: 80px; padding: 4px; border-width: 1px; border-radius: 4px; }
+            .day-number { font-size: 12px; margin-bottom: 2px; }
+            .holiday-name { font-size: 8px; }
+            .staff-availability-list { max-height: 20px; gap: 1px; }
+            .staff-avail-item { font-size: 7px; padding: 1px 3px; }
+            .shift-dot { width: 5px; height: 5px; }
+            .schedule-list { gap: 1px; }
+            .schedule-item-full { font-size: 7px; padding: 2px 3px; }
+            .schedule-item-full .time { font-size: 6px; }
+            
+            /* 圖例 */
+            .legend-bar { padding: 8px 10px; gap: 10px; }
+            .legend-item { font-size: 11px; }
+            .legend-color { width: 12px; height: 12px; }
+            
+            /* Modal 手機版 */
+            .modal-overlay { align-items: flex-end; }
+            .modal { max-width: 100%; width: 100%; border-radius: 16px 16px 0 0; max-height: 85vh; padding: 20px 15px; }
+            .modal h3 { font-size: 16px; }
+            .schedule-modal-content { max-width: 100%; }
+            .staff-shift-row { padding: 8px; gap: 6px; }
+            .staff-shift-row .staff-info { min-width: 70px; }
+            .staff-shift-row .staff-name { font-size: 12px; }
+            .staff-shift-row .staff-status { font-size: 9px; padding: 1px 4px; }
+            .shift-toggle-btn { padding: 5px 8px; font-size: 10px; }
+            .overtime-input { width: 40px; padding: 4px; font-size: 11px; }
+            .note-input { width: 60px; padding: 4px; font-size: 10px; }
+            
+            /* 按鈕 */
+            .btn { padding: 10px 16px; font-size: 13px; }
+            .btn-add { padding: 12px; }
+        }
+
+        @media (max-width: 374px) {
+            .navbar h1 { font-size: 14px; }
+            .tab { padding: 8px 8px; font-size: 11px; }
+            .day-cell { min-height: 70px; padding: 3px; }
+            .day-number { font-size: 11px; }
+            .staff-avail-item { font-size: 6px; }
+            .schedule-item-full { font-size: 6px; }
+            .shift-toggle-btn { padding: 4px 6px; font-size: 9px; }
+            .staff-shift-row .staff-name { font-size: 11px; }
+        }
     </style>
 </head>
 <body>
@@ -204,6 +308,10 @@
         <div class="modal schedule-modal-content">
             <h3>📅 排班設定</h3>
             <div class="schedule-date-header" id="scheduleDateHeader">2025-01-15 (週三)</div>
+            <div class="schedule-legend">
+                <span class="legend-tag available">✓ 可上班</span>
+                <span class="legend-tag unavailable">✗ 未填</span>
+            </div>
             <div class="staff-shift-grid" id="staffShiftGrid"></div>
             <div class="modal-buttons">
                 <button class="btn btn-secondary" onclick="closeModal('scheduleModal')">取消</button>
@@ -216,7 +324,7 @@
 
     <script>
         // ============ 設定區 ============
-        const API_URL = 'https://script.google.com/macros/s/AKfycbwYXJ-tlMwjhlWoQEeJvIkU17Cw7fm0FiEXgKvHUc5fYP-fh1rSfDpw4QGH-KUdTJY/exec';
+        const API_URL = 'https://script.google.com/macros/s/AKfycbyvNJrJrqRhrTcFkNGIRU_uOekmesG2xGpb4fdkISCXKuazZAhaN1QlJn3Uv7gzAPZK/exec';
         
         let staffList = [];
         let shifts = [];
@@ -426,7 +534,14 @@
                         const shift = shifts.find(s => s.id === item.shiftId);
                         const color = shift ? shift.color : '#999';
                         const shiftName = shift ? shift.name : item.shiftId;
-                        html += `<div class="schedule-item" style="background: ${color};">${item.staffName} - ${shiftName}${item.overtime ? ` +${item.overtime}h` : ''}</div>`;
+                        const shiftTime = shift ? shift.time : '';
+                        const overtime = item.overtime ? ` +${item.overtime}h` : '';
+                        const note = item.note ? `（${item.note}）` : '';
+                        html += `<div class="schedule-item-full" style="background: ${color};">
+                            <div>${item.staffName} ${shiftName}${note}${overtime}</div>
+                            ${shiftTime ? `<div class="time">${shiftTime}</div>` : ''}
+                        </div>`;
+                        </div>`;
                     });
                     html += '</div>';
                 }
@@ -452,30 +567,72 @@
             const dayOfWeek = ['日', '一', '二', '三', '四', '五', '六'][date.getDay()];
             document.getElementById('scheduleDateHeader').textContent = `${dateStr} (週${dayOfWeek})`;
             
-            const availableStaff = staffList.filter(s => s.availability && s.availability.includes(dateStr));
             const daySchedule = schedule[dateStr] || [];
             const grid = document.getElementById('staffShiftGrid');
             
-            if (availableStaff.length === 0) { grid.innerHTML = '<p style="color:#666;padding:10px;">該日沒有員工可上班</p>'; }
-            else {
+            if (staffList.length === 0) { 
+                grid.innerHTML = '<p style="color:#666;padding:10px;">尚無員工資料，請先新增員工</p>'; 
+            } else {
                 let html = '';
-                availableStaff.forEach(staff => {
-                    const match = staff.availability.match(new RegExp(dateStr + '\\(([^)]+)\\)'));
-                    const availInfo = match ? match[1] : '整天';
-                    const canAllDay = availInfo === '整天';
-                    const availNames = canAllDay ? shifts.map(s => s.name) : availInfo.split('+');
+                staffList.forEach(staff => {
+                    // 檢查該員工當天是否可上班
+                    const isAvailable = staff.availability && staff.availability.includes(dateStr);
+                    let availInfo = '';
+                    let availShiftNames = [];
+                    let canAllDay = false;
+                    
+                    if (isAvailable) {
+                        const match = staff.availability.match(new RegExp(dateStr + '\\(([^)]+)\\)'));
+                        availInfo = match ? match[1] : '整天';
+                        canAllDay = availInfo === '整天';
+                        availShiftNames = canAllDay ? shifts.map(s => s.name) : availInfo.split('+');
+                    }
+                    
+                    // 該員工當天已排的班
                     const staffSched = daySchedule.find(s => s.staffName === staff.name);
                     
-                    html += `<div class="staff-shift-row" data-staff="${staff.name}"><span class="staff-name">${staff.name}</span><div class="shift-buttons">`;
+                    const rowClass = isAvailable ? 'staff-shift-row can-work' : 'staff-shift-row';
+                    
+                    html += `<div class="${rowClass}" data-staff="${staff.name}">
+                        <div class="staff-info">
+                            <span class="staff-name">${staff.name}</span>
+                            <span class="staff-status ${isAvailable ? 'available' : 'unavailable'}">${isAvailable ? '✓可' : '✗'}</span>
+                        </div>
+                        <div class="shift-buttons">
+                            <button class="shift-toggle-btn no-schedule ${!staffSched ? 'selected' : ''}" 
+                                data-shift-id="" data-staff="${staff.name}"
+                                onclick="toggleShiftBtn(this, '#9ca3af')">不排</button>`;
+                    
                     shifts.forEach(shift => {
-                        const canWork = canAllDay || availNames.includes(shift.name);
                         const isSelected = staffSched && staffSched.shiftId === shift.id;
-                        html += `<button class="shift-toggle-btn ${isSelected ? 'selected' : ''}" 
-                            style="border-color:${shift.color};${isSelected ? 'background:' + shift.color : ''}"
-                            data-shift-id="${shift.id}" data-staff="${staff.name}" ${canWork ? '' : 'disabled'}
+                        // 如果員工可上班，檢查是否可上這個班別；如果不可上班，也讓管理者可以強制排班
+                        const canWorkThisShift = !isAvailable || canAllDay || availShiftNames.includes(shift.name);
+                        const btnClass = isSelected ? 'selected' : '';
+                        const style = `border-color:${shift.color};${isSelected ? 'background:' + shift.color : ''}`;
+                        
+                        html += `<button class="shift-toggle-btn ${btnClass}" 
+                            style="${style}"
+                            data-shift-id="${shift.id}" data-staff="${staff.name}"
+                            title="${shift.time}"
                             onclick="toggleShiftBtn(this,'${shift.color}')">${shift.name}</button>`;
                     });
-                    html += `</div><input type="number" class="overtime-input" data-staff="${staff.name}" value="${staffSched ? staffSched.overtime : 0}" min="0" max="8"><span style="font-size:11px;color:#666;">h</span></div>`;
+                    
+                    // 加班時數
+                    const overtime = staffSched ? staffSched.overtime : 0;
+                    const note = staffSched ? (staffSched.note || '') : '';
+                    html += `</div>
+                        <div class="controls">
+                            <input type="text" class="note-input" data-staff="${staff.name}" value="${note}" placeholder="備註">
+                            <input type="number" class="overtime-input" data-staff="${staff.name}" value="${overtime}" min="0" max="8" placeholder="0">
+                            <span style="font-size:10px;color:#666;">h</span>
+                        </div>`;
+                    
+                    // 顯示可上班時段資訊
+                    if (isAvailable) {
+                        html += `<div class="avail-shifts-info">可：${availInfo}</div>`;
+                    }
+                    
+                    html += `</div>`;
                 });
                 grid.innerHTML = html;
             }
@@ -484,7 +641,14 @@
 
         function toggleShiftBtn(btn, color) {
             const row = btn.closest('.staff-shift-row');
-            row.querySelectorAll('.shift-toggle-btn').forEach(b => { b.classList.remove('selected'); b.style.background = 'white'; });
+            row.querySelectorAll('.shift-toggle-btn').forEach(b => { 
+                b.classList.remove('selected'); 
+                if (b.classList.contains('no-schedule')) {
+                    b.style.background = 'white';
+                } else {
+                    b.style.background = 'white'; 
+                }
+            });
             btn.classList.add('selected');
             btn.style.background = color;
         }
@@ -496,7 +660,12 @@
                 const staffName = row.dataset.staff;
                 const selectedBtn = row.querySelector('.shift-toggle-btn.selected');
                 const overtime = parseInt(row.querySelector('.overtime-input').value) || 0;
-                if (selectedBtn) daySchedule.push({ staffName, shiftId: selectedBtn.dataset.shiftId, overtime });
+                const noteInput = row.querySelector('.note-input');
+                const note = noteInput ? noteInput.value.trim() : '';
+                // 只有選了班別（不是「不排」）才加入排班
+                if (selectedBtn && selectedBtn.dataset.shiftId) {
+                    daySchedule.push({ staffName, shiftId: selectedBtn.dataset.shiftId, overtime, note });
+                }
             });
             schedule[currentEditingDate] = daySchedule;
             saveLocalSchedule();
@@ -511,26 +680,54 @@
 
         async function exportSchedule() {
             if (!API_URL) { showToast('請先設定 API'); return; }
-            const exportData = [];
+            
+            // 整理排班資料（按日期分組）
+            const scheduleData = {};
             const lastDay = new Date(currentYear, currentMonth + 1, 0);
+            
             for (let day = 1; day <= lastDay.getDate(); day++) {
                 const date = new Date(currentYear, currentMonth, day);
                 const dateStr = formatDate(date);
-                const dayOfWeek = ['日', '一', '二', '三', '四', '五', '六'][date.getDay()];
-                const holidayInfo = holidays.find(h => h.date === dateStr);
                 const daySchedule = schedule[dateStr] || [];
-                daySchedule.forEach((item, idx) => {
-                    const shift = shifts.find(s => s.id === item.shiftId);
-                    exportData.push({ date: dateStr, dayOfWeek, holiday: holidayInfo?.name || '', staffName: item.staffName, shiftName: shift?.name || '', shiftTime: shift?.time || '', overtime: item.overtime || 0, isFirst: idx === 0 });
-                });
+                
+                if (daySchedule.length > 0) {
+                    scheduleData[dateStr] = daySchedule.map(item => {
+                        const shift = shifts.find(s => s.id === item.shiftId);
+                        return {
+                            staffName: item.staffName,
+                            shiftName: shift ? shift.name : '',
+                            shiftTime: shift ? shift.time : '',
+                            overtime: item.overtime || 0,
+                            note: item.note || ''
+                        };
+                    });
+                }
             }
-            if (exportData.length === 0) { showToast('沒有排班資料'); return; }
+            
+            // 整理假日列表
+            const holidayDates = holidays.map(h => h.date);
+            
+            if (Object.keys(scheduleData).length === 0) { 
+                showToast('沒有排班資料'); 
+                return; 
+            }
+            
+            showToast('📤 匯出中...');
+            
             try {
-                const payload = encodeURIComponent(JSON.stringify({ year: currentYear, month: currentMonth + 1, data: exportData }));
+                const payload = encodeURIComponent(JSON.stringify({ 
+                    year: currentYear, 
+                    month: currentMonth + 1, 
+                    scheduleData: scheduleData,
+                    holidays: holidayDates
+                }));
                 const res = await fetch(API_URL + '?action=exportSchedule&data=' + payload);
                 const data = await res.json();
-                showToast(data.success ? '✅ 已匯出到 Sheets' : '❌ 匯出失敗');
-            } catch (e) { showToast('❌ 匯出失敗'); }
+                showToast(data.success ? '✅ ' + data.message : '❌ 匯出失敗：' + (data.error || ''));
+            } catch (e) { 
+                console.error('匯出失敗', e);
+                showToast('❌ 匯出失敗'); 
+            }
         }
 
         function prevMonth() { currentMonth--; if (currentMonth < 0) { currentMonth = 11; currentYear--; fetchHolidays(currentYear).then(h => { holidays = h; generateCalendar(); }); } else generateCalendar(); }
