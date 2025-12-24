@@ -512,22 +512,40 @@
         }
 
         async function fetchHolidays(year) {
-            try {
-                const apiUrl = `https://data.gov.tw/api/v1/rest/datastore/A00000000J-000001-001`;
-                const params = new URLSearchParams({ limit: 1000, filters: JSON.stringify({ "西元日期": { "$like": `${year}%` } }) });
-                const response = await fetch(`${apiUrl}?${params}`);
-                const data = await response.json();
-                if (data.success && data.result && data.result.records) {
-                    const holidayMap = new Map();
-                    data.result.records.forEach(record => {
-                        if (record['是否放假'] === '2') {
-                            let name = (record['備註'] || '').replace(/放假之紀念日及節日日期/g, '').trim() || '假日';
-                            holidayMap.set(record['西元日期'], { date: record['西元日期'], name, isHoliday: true });
-                        }
-                    });
-                    return Array.from(holidayMap.values());
+            // 透過 Apps Script 代理取得假日資料（避免 CORS）
+            if (API_URL) {
+                try {
+                    const res = await fetch(API_URL + '?action=getHolidays&year=' + year);
+                    const data = await res.json();
+                    if (data.success && data.holidays) {
+                        return data.holidays;
+                    }
+                } catch (e) {
+                    console.error('透過 API 載入假日失敗', e);
                 }
-            } catch (e) {}
+            }
+            
+            // 備用：使用預設假日
+            return getDefaultHolidays(year);
+        }
+        
+        function getDefaultHolidays(year) {
+            if (year === 2025) {
+                return [
+                    { date: '2025-01-01', name: '元旦', isHoliday: true },
+                    { date: '2025-01-28', name: '春節', isHoliday: true },
+                    { date: '2025-01-29', name: '春節', isHoliday: true },
+                    { date: '2025-01-30', name: '春節', isHoliday: true },
+                    { date: '2025-01-31', name: '春節', isHoliday: true },
+                    { date: '2025-02-01', name: '春節', isHoliday: true },
+                    { date: '2025-02-28', name: '和平紀念日', isHoliday: true },
+                    { date: '2025-04-04', name: '清明節', isHoliday: true },
+                    { date: '2025-05-01', name: '勞動節', isHoliday: true },
+                    { date: '2025-05-31', name: '端午節', isHoliday: true },
+                    { date: '2025-10-06', name: '中秋節', isHoliday: true },
+                    { date: '2025-10-10', name: '國慶日', isHoliday: true }
+                ];
+            }
             return [];
         }
 
@@ -783,14 +801,13 @@
             showToast('📤 正在送出...');
             
             try {
-                const res = await fetch(API_URL + '?action=updateAvailability', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ staffName, availability: availabilityStr })
-                });
+                // 使用 GET + URL 參數方式避免 CORS 問題
+                const payload = encodeURIComponent(JSON.stringify({ staffName, availability: availabilityStr }));
+                const res = await fetch(API_URL + '?action=updateAvailability&data=' + payload);
                 const data = await res.json();
                 showToast(data.success ? '✅ 已送出！' : '❌ 送出失敗：' + (data.error || ''));
             } catch (e) {
+                console.error('送出失敗', e);
                 showToast('❌ 送出失敗，請檢查網路');
             }
         }
