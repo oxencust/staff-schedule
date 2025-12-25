@@ -273,7 +273,7 @@
         .shift-modal-btn.cancel { background: #e9ecef; color: #495057; }
         .shift-modal-btn.confirm { background: var(--pink); color: white; }
 
-        .action-buttons { display: flex; gap: 10px; margin-top: 15px; }
+        .submit-section { display: flex; gap: 10px; margin-top: 15px; }
         .btn { 
             flex: 1; padding: 14px; border: none; border-radius: 10px;
             font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit;
@@ -315,17 +315,131 @@
         .api-setup input { width: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 8px; font-size: 13px; margin-bottom: 10px; }
         .api-setup .btn { width: 100%; }
 
+        /* ========== 手機版優化 ========== */
         @media (min-width: 768px) {
             .navbar h1 { font-size: 20px; }
             .month-display { font-size: 24px; min-width: 200px; }
             .day-cell { min-height: 80px; padding: 8px; }
             .modal { max-width: 500px; }
+            .container { padding-bottom: 20px; }
         }
+
+        @media (max-width: 767px) {
+            body { padding-bottom: 80px; }
+            
+            .navbar { padding: 12px 15px; }
+            .navbar h1 { font-size: 17px; }
+            
+            .container { padding: 10px; }
+            
+            /* 控制面板 */
+            .control-panel { padding: 12px; border-radius: 10px; margin-bottom: 10px; }
+            .staff-name-display { font-size: 14px; }
+            .staff-name { font-size: 16px; }
+            
+            /* 月份選擇器 */
+            .month-selector { margin-bottom: 10px; }
+            .month-btn { padding: 10px 14px; font-size: 16px; min-width: 44px; }
+            .month-display { font-size: 18px; min-width: 140px; }
+            
+            /* 統計區 */
+            .stats-bar { padding: 10px; gap: 8px; margin-bottom: 10px; }
+            .stat-item { padding: 8px 12px; }
+            .stat-value { font-size: 18px; }
+            .stat-label { font-size: 10px; }
+            
+            /* 日曆 */
+            .calendar-wrapper { padding: 8px; border-radius: 10px; }
+            .calendar { gap: 3px; }
+            .calendar-header { padding: 8px 2px; font-size: 13px; font-weight: 600; }
+            .day-cell { 
+                min-height: 55px; 
+                padding: 4px; 
+                border-radius: 6px;
+                -webkit-tap-highlight-color: transparent;
+            }
+            .day-cell:active { transform: scale(0.95); }
+            .day-number { font-size: 13px; font-weight: 700; }
+            .holiday-name { font-size: 8px; margin-top: 1px; }
+            .shift-badges { gap: 2px; margin-top: 2px; }
+            .shift-badge { font-size: 8px; padding: 1px 4px; }
+            
+            /* 底部固定按鈕 */
+            .submit-section {
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                background: white;
+                padding: 12px 15px;
+                box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+                z-index: 100;
+                border-radius: 16px 16px 0 0;
+            }
+            .btn-submit { 
+                padding: 14px 20px; 
+                font-size: 16px; 
+                border-radius: 12px;
+                width: 100%;
+            }
+            
+            /* Modal 優化 */
+            .modal-overlay { align-items: flex-end; }
+            .modal { 
+                max-width: 100%; 
+                width: 100%; 
+                border-radius: 20px 20px 0 0; 
+                max-height: 80vh; 
+                padding: 20px 15px 30px;
+            }
+            .modal h3 { font-size: 18px; text-align: center; }
+            .modal-date { font-size: 14px; }
+            
+            /* 班別選項 */
+            .shift-options-container { gap: 8px; }
+            .shift-option { 
+                padding: 14px 12px; 
+                border-radius: 10px;
+                -webkit-tap-highlight-color: transparent;
+            }
+            .shift-option:active { transform: scale(0.98); }
+            .shift-option-checkbox { width: 22px; height: 22px; }
+            .shift-option-title { font-size: 15px; }
+            .shift-option-time { font-size: 12px; }
+            
+            .modal-buttons { gap: 10px; margin-top: 15px; }
+            .modal-buttons .btn { 
+                padding: 14px 20px; 
+                font-size: 15px; 
+                border-radius: 10px;
+                min-height: 48px;
+            }
+            
+            /* 確認 Modal */
+            .confirm-content { padding: 15px; }
+            .confirm-content p { font-size: 14px; line-height: 1.6; }
+        }
+
         @media (max-width: 374px) {
-            .navbar h1 { font-size: 16px; }
-            .month-display { font-size: 18px; min-width: 130px; }
-            .day-cell { min-height: 60px; padding: 4px; }
+            .navbar h1 { font-size: 15px; }
+            .month-display { font-size: 16px; min-width: 120px; }
+            .month-btn { padding: 8px 12px; font-size: 14px; }
+            .day-cell { min-height: 50px; padding: 3px; }
             .day-number { font-size: 12px; }
+            .holiday-name { font-size: 7px; }
+            .shift-badge { font-size: 7px; padding: 1px 3px; }
+            .stat-value { font-size: 16px; }
+            .stat-label { font-size: 9px; }
+            .shift-option { padding: 12px 10px; }
+            .shift-option-title { font-size: 14px; }
+        }
+
+        /* 觸控優化 */
+        @media (hover: none) and (pointer: coarse) {
+            .day-cell:hover { border-color: inherit; box-shadow: none; }
+            .day-cell.available:hover { border-color: var(--pink); }
+            .month-btn:hover { background: var(--pink); }
+            .btn:hover { filter: none; }
         }
     </style>
 </head>
@@ -380,9 +494,11 @@
                 </div>
             </div>
 
-            <div class="action-buttons">
-                <button class="btn btn-secondary" onclick="clearAll()">🗑️ 清除</button>
-                <button class="btn btn-primary" onclick="showConfirmModal()">✅ 送出</button>
+            <div class="submit-section">
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn btn-secondary" onclick="clearAll()" style="flex: 1;">🗑️ 清除</button>
+                    <button class="btn btn-primary btn-submit" onclick="showConfirmModal()" style="flex: 2;">✅ 送出</button>
+                </div>
             </div>
 
             <div class="info-card" style="margin-top: 15px;">
@@ -448,7 +564,7 @@
 
     <script>
         // ============ 設定區 ============
-        const API_URL = 'https://script.google.com/macros/s/AKfycbzXyvvSXR5mw4bROb6kWI8S5mz6g2TQ-VvlvEYgvW3fDXaPfB932Y-tTd2IUMHVY_LO/exec';
+        const API_URL = 'https://script.google.com/macros/s/AKfycbz6Ecd7Yzuy6RlGXTkV6q8udOon9sgvZ0hW4nhqyvJO6zFJXbORMOydq9FPNxM5FCuF/exec';
         
         let currentYear = new Date().getFullYear();
         let currentMonth = new Date().getMonth();
@@ -494,13 +610,23 @@
         }
 
         async function fetchHolidays(year) {
-            // 透過 Apps Script 代理取得假日資料（避免 CORS）
+            // 直接使用 ruyut 的 Taiwan Calendar API（免 CORS、快速穩定）
             try {
-                const res = await fetch(API_URL + '?action=getHolidays&year=' + year);
+                const res = await fetch('https://cdn.jsdelivr.net/gh/ruyut/TaiwanCalendar/data/' + year + '.json');
                 const data = await res.json();
-                if (data.success && data.holidays) {
-                    console.log('已載入 ' + year + ' 年假日：', data.holidays.length + ' 筆');
-                    return data.holidays;
+                if (data && Array.isArray(data)) {
+                    const holidays = [];
+                    data.forEach(record => {
+                        // 只取有節日名稱的假日（排除一般週末）
+                        if (record.isHoliday && record.description && record.description.trim() !== '') {
+                            // 轉換日期格式 20260101 → 2026-01-01
+                            const d = record.date;
+                            const formattedDate = d.substring(0, 4) + '-' + d.substring(4, 6) + '-' + d.substring(6, 8);
+                            holidays.push({ date: formattedDate, name: record.description });
+                        }
+                    });
+                    console.log('已載入 ' + year + ' 年假日：', holidays.length + ' 筆');
+                    return holidays;
                 }
             } catch (e) {
                 console.error('載入假日失敗', e);
