@@ -324,7 +324,7 @@
 
     <script>
         // ============ 設定區 ============
-        const API_URL = 'https://script.google.com/macros/s/AKfycbzXyvvSXR5mw4bROb6kWI8S5mz6g2TQ-VvlvEYgvW3fDXaPfB932Y-tTd2IUMHVY_LO/exec';
+        const API_URL = 'https://script.google.com/macros/s/AKfycbz6Ecd7Yzuy6RlGXTkV6q8udOon9sgvZ0hW4nhqyvJO6zFJXbORMOydq9FPNxM5FCuF/exec';
         
         let staffList = [];
         let shifts = [];
@@ -478,11 +478,22 @@
 
         async function fetchHolidays(year) {
             try {
-                const res = await fetch(API_URL + '?action=getHolidays&year=' + year);
+                // 直接使用 ruyut 的 Taiwan Calendar API（免 CORS、快速穩定）
+                const res = await fetch('https://cdn.jsdelivr.net/gh/ruyut/TaiwanCalendar/data/' + year + '.json');
                 const data = await res.json();
-                if (data.success && data.holidays) {
-                    console.log('已載入 ' + year + ' 年假日：', data.holidays.length + ' 筆');
-                    return data.holidays;
+                if (data && Array.isArray(data)) {
+                    const holidays = [];
+                    data.forEach(record => {
+                        // 只取有節日名稱的假日（排除一般週末）
+                        if (record.isHoliday && record.description && record.description.trim() !== '') {
+                            // 轉換日期格式 20260101 → 2026-01-01
+                            const d = record.date;
+                            const formattedDate = d.substring(0, 4) + '-' + d.substring(4, 6) + '-' + d.substring(6, 8);
+                            holidays.push({ date: formattedDate, name: record.description });
+                        }
+                    });
+                    console.log('已載入 ' + year + ' 年假日：', holidays.length + ' 筆');
+                    return holidays;
                 }
             } catch (e) {
                 console.error('載入假日失敗', e);
@@ -537,10 +548,11 @@
                         const shiftTime = shift ? shift.time : '';
                         const overtime = item.overtime ? ` +${item.overtime}h` : '';
                         const note = item.note ? `（${item.note}）` : '';
-                        html += `<div class="schedule-item-full" style="background: ${color};">
-                            <div>${item.staffName} ${shiftName}${note}${overtime}</div>
-                            ${shiftTime ? `<div class="time">${shiftTime}</div>` : ''}
-                        </div>`;
+                        const timeHtml = shiftTime ? '<div class="time">' + shiftTime + '</div>' : '';
+                        html += '<div class="schedule-item-full" style="background: ' + color + ';">';
+                        html += '<div>' + item.staffName + ' ' + shiftName + note + overtime + '</div>';
+                        html += timeHtml;
+                        html += '</div>';
                     });
                     html += '</div>';
                 }
