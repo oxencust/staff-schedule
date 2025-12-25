@@ -102,6 +102,8 @@
         .btn-add { background: var(--green-light); color: var(--green-dark); border: 2px dashed var(--green); }
         .btn-export { background: var(--blue); color: white; }
         .btn-save { background: var(--pink); color: white; }
+        .btn-danger { background: #ef4444; color: white; }
+        .btn-danger:hover { background: #dc2626; }
 
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
         .modal-overlay.show { display: flex; }
@@ -168,15 +170,117 @@
             .tab-content { padding: 12px; }
             .settings-panel { padding: 15px; border-radius: 10px; }
             
-            /* 員工表格手機版 */
-            .staff-table { font-size: 13px; }
-            .staff-table th, .staff-table td { padding: 8px 6px; }
+            /* 員工表格手機版 - 卡片式設計 */
+            .staff-table { font-size: 14px; }
             .staff-table thead { display: none; }
-            .staff-table tr { display: block; margin-bottom: 15px; border: 1px solid #e0e0e0; border-radius: 8px; padding: 10px; }
-            .staff-table td { display: flex; justify-content: space-between; align-items: center; border: none; padding: 6px 0; }
-            .staff-table td::before { content: attr(data-label); font-weight: 600; color: var(--green-dark); margin-right: 10px; }
-            .staff-link { font-size: 11px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
-            .availability-text { max-width: 100%; font-size: 11px; }
+            .staff-table tbody { display: flex; flex-direction: column; gap: 12px; }
+            .staff-table tr { 
+                display: block; 
+                background: white;
+                border: 1px solid #e0e0e0; 
+                border-radius: 12px; 
+                padding: 15px;
+                box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+                border-left: 4px solid var(--green);
+            }
+            .staff-table td { 
+                display: flex; 
+                flex-direction: column;
+                align-items: flex-start;
+                border: none; 
+                padding: 8px 0;
+                gap: 4px;
+            }
+            .staff-table td::before { 
+                content: attr(data-label); 
+                font-size: 11px;
+                font-weight: 600; 
+                color: var(--gray);
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+            }
+            .staff-table td[data-label="姓名"] {
+                flex-direction: row;
+                align-items: center;
+                padding-bottom: 10px;
+                margin-bottom: 5px;
+                border-bottom: 1px dashed #e0e0e0;
+            }
+            .staff-table td[data-label="姓名"]::before { display: none; }
+            .staff-table td[data-label="姓名"] strong {
+                font-size: 18px;
+                color: var(--green-dark);
+            }
+            .staff-table td[data-label="排班連結"] {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .staff-link { 
+                font-size: 12px; 
+                max-width: 100%; 
+                overflow: hidden; 
+                text-overflow: ellipsis;
+                word-break: break-all;
+                color: var(--blue);
+                background: var(--blue-light);
+                padding: 8px 10px;
+                border-radius: 6px;
+                display: block;
+            }
+            .copy-btn {
+                margin-top: 8px;
+                padding: 8px 16px;
+                background: var(--green);
+                color: white;
+                border: none;
+                border-radius: 6px;
+                font-size: 13px;
+                font-weight: 600;
+                width: 100%;
+            }
+            .availability-text { 
+                max-width: 100%; 
+                font-size: 13px;
+                background: var(--green-light);
+                padding: 10px;
+                border-radius: 6px;
+                white-space: pre-line;
+                line-height: 1.6;
+                width: 100%;
+                box-sizing: border-box;
+            }
+            .staff-table .total-days {
+                flex-direction: row;
+                justify-content: space-between;
+                align-items: center;
+                background: var(--yellow-light);
+                padding: 10px 12px;
+                border-radius: 6px;
+            }
+            .staff-table .total-days::after {
+                content: '天';
+                font-size: 16px;
+                font-weight: 700;
+                color: var(--green);
+            }
+            .staff-table .submit-time {
+                font-size: 12px;
+                color: #666;
+            }
+            .staff-table .action-cell {
+                padding-top: 12px;
+                margin-top: 5px;
+                border-top: 1px dashed #e0e0e0;
+            }
+            .staff-table .action-cell::before { display: none; }
+            .staff-table .delete-btn {
+                width: 100%;
+                padding: 10px;
+                font-size: 14px;
+                background: #fee2e2;
+                color: #dc2626;
+                border: 1px solid #fecaca;
+            }
             
             /* 班別設定手機版 */
             .shift-item { flex-wrap: wrap; padding: 10px; }
@@ -284,7 +388,7 @@
                 </div>
                 <div class="calendar-actions">
                     <button class="btn btn-secondary" onclick="refreshData()">🔄 重新整理</button>
-                    <button class="btn btn-save" onclick="saveSchedule()">💾 儲存排班</button>
+                    <button class="btn btn-danger" onclick="clearSchedule()">🗑️ 清除排班</button>
                     <button class="btn btn-export" onclick="exportSchedule()">📤 匯出</button>
                 </div>
             </div>
@@ -384,12 +488,14 @@
             if (staffList.length === 0) { container.innerHTML = '<p style="color: #666; padding: 20px;">尚無員工</p>'; return; }
             let html = `<table class="staff-table"><thead><tr><th>姓名</th><th>排班連結</th><th>可上班時間</th><th>總天數</th><th>送出時間</th><th>操作</th></tr></thead><tbody>`;
             staffList.forEach(staff => {
-                html += `<tr><td><strong>${staff.name}</strong></td>
-                    <td><a href="${staff.link}" target="_blank" class="staff-link">${staff.link}</a><button class="copy-btn" onclick="copyLink('${staff.link}')">複製</button></td>
-                    <td class="availability-text">${staff.availability || '尚未填寫'}</td>
-                    <td style="text-align:center;font-weight:600;color:var(--green);">${staff.totalDays || 0}</td>
-                    <td style="font-size:12px;color:#666;">${staff.submitTime || '-'}</td>
-                    <td><button class="btn btn-secondary" style="padding:6px 12px;font-size:12px;" onclick="deleteStaff('${staff.name}')">刪除</button></td></tr>`;
+                html += `<tr>
+                    <td data-label="姓名"><strong>${staff.name}</strong></td>
+                    <td data-label="排班連結"><a href="${staff.link}" target="_blank" class="staff-link">${staff.link}</a><button class="copy-btn" onclick="copyLink('${staff.link}')">複製</button></td>
+                    <td data-label="可上班時間" class="availability-text">${staff.availability || '尚未填寫'}</td>
+                    <td data-label="總天數" class="total-days">${staff.totalDays || 0}</td>
+                    <td data-label="送出時間" class="submit-time">${staff.submitTime || '-'}</td>
+                    <td data-label="" class="action-cell"><button class="btn btn-secondary delete-btn" onclick="deleteStaff('${staff.name}')">刪除</button></td>
+                </tr>`;
             });
             html += '</tbody></table>';
             container.innerHTML = html;
@@ -687,7 +793,14 @@
 
         function saveLocalSchedule() { localStorage.setItem('schedule', JSON.stringify(schedule)); }
         function loadLocalSchedule() { const saved = localStorage.getItem('schedule'); if (saved) schedule = JSON.parse(saved); }
-        function saveSchedule() { saveLocalSchedule(); showToast('💾 排班已儲存'); }
+        
+        function clearSchedule() {
+            if (!confirm('確定要清除所有排班資料嗎？此動作無法復原！')) return;
+            schedule = {};
+            localStorage.removeItem('schedule');
+            generateCalendar();
+            showToast('🗑️ 已清除所有排班');
+        }
 
         async function exportSchedule() {
             if (!API_URL) { showToast('請先設定 API'); return; }
