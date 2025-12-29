@@ -428,7 +428,7 @@
 
     <script>
         // ============ 設定區 ============
-        const API_URL = 'https://script.google.com/macros/s/AKfycbzNW5N7oDPsWGrrtD3V0SVccouKfbD3stYg29HTB0KdXTBAajcP8pGIxmtpbjxMJLV9/exec';
+        const API_URL = 'https://script.google.com/macros/s/AKfycbxw-spdxMN_6Ec8OTUdGTDKDD3WBMe5h227XxEXQGY5YDwahCCcWJkZc61Mxvpg1wWb/exec';
         
         let staffList = [];
         let shifts = [];
@@ -805,8 +805,8 @@
         async function exportSchedule() {
             if (!API_URL) { showToast('請先設定 API'); return; }
             
-            // 整理排班資料（簡化格式減少資料量）
-            const scheduleData = {};
+            // 極簡格式：只傳 staffName 和 shiftId，Apps Script 會查找班別資訊
+            const d = {};
             const lastDay = new Date(currentYear, currentMonth + 1, 0);
             
             for (let day = 1; day <= lastDay.getDate(); day++) {
@@ -815,28 +815,24 @@
                 const daySchedule = schedule[dateStr] || [];
                 
                 if (daySchedule.length > 0) {
-                    // 簡化格式：只傳 staffName, shiftId, overtime, note
-                    scheduleData[dateStr] = daySchedule.map(item => {
-                        const shift = shifts.find(s => s.id === item.shiftId);
-                        return {
-                            s: item.staffName,           // staffName 縮寫
-                            n: shift ? shift.name : '',  // shiftName
-                            t: shift ? shift.time : '',  // shiftTime
-                            o: item.overtime || 0,       // overtime
-                            r: item.note || ''           // remark/note
-                        };
-                    });
+                    // 極簡格式：[staffName, shiftId, overtime, note] 用陣列更短
+                    d[day] = daySchedule.map(item => [
+                        item.staffName,
+                        item.shiftId,
+                        item.overtime || 0,
+                        item.note || ''
+                    ]);
                 }
             }
             
-            // 整理假日列表（只取當月）
-            const monthStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
-            const holidayDates = holidays.filter(h => h.date.startsWith(monthStr)).map(h => h.date);
-            
-            if (Object.keys(scheduleData).length === 0) { 
+            if (Object.keys(d).length === 0) { 
                 showToast('沒有排班資料'); 
                 return; 
             }
+            
+            // 整理假日列表（只取當月的日期數字）
+            const monthStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
+            const h = holidays.filter(x => x.date.startsWith(monthStr)).map(x => parseInt(x.date.split('-')[2]));
             
             showToast('📤 匯出中...');
             
@@ -844,21 +840,18 @@
                 const payload = {
                     y: currentYear,
                     m: currentMonth + 1,
-                    d: scheduleData,
-                    h: holidayDates
+                    d: d,
+                    h: h
                 };
                 
-                // 將資料轉成 JSON 字串
                 const jsonStr = JSON.stringify(payload);
                 console.log('匯出資料大小:', jsonStr.length, '字元');
                 
-                // 檢查資料大小
-                if (jsonStr.length > 7000) {
-                    showToast('⚠️ 資料量太大，請分批匯出');
+                if (jsonStr.length > 7500) {
+                    showToast('⚠️ 資料量太大（' + jsonStr.length + '字元），請減少排班');
                     return;
                 }
                 
-                // 使用 GET 請求（更穩定）
                 const encodedData = encodeURIComponent(jsonStr);
                 const res = await fetch(API_URL + '?action=exportSchedule&data=' + encodedData);
                 const data = await res.json();
