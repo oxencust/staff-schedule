@@ -265,6 +265,14 @@
         .shift-option-title { font-size: 14px; font-weight: 600; margin-bottom: 2px; }
         .shift-option-time { font-size: 11px; color: var(--gray); }
         .shift-option-color { width: 20px; height: 20px; border-radius: 4px; flex-shrink: 0; }
+        
+        /* 其他班別自訂時間 */
+        .custom-shift-inputs { display: none; margin-top: 10px; padding: 12px; background: #f8f9fa; border-radius: 8px; }
+        .custom-shift-inputs.show { display: block; }
+        .custom-time-row { display: flex; align-items: center; gap: 8px; }
+        .custom-time-input { flex: 1; padding: 10px 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 16px; text-align: center; font-family: monospace; }
+        .custom-time-input:focus { outline: none; border-color: var(--pink); }
+        .custom-time-separator { font-weight: 600; color: #666; }
         .shift-modal-buttons { display: flex; gap: 8px; }
         .shift-modal-btn {
             flex: 1; padding: 10px; border: none; border-radius: 8px;
@@ -564,7 +572,7 @@
 
     <script>
         // ============ 設定區 ============
-        const API_URL = 'https://script.google.com/macros/s/AKfycbzvTCxhJtLiMhe8mZpsuzHnhv2ZoDode66Fytn-OVctZ1-UWm0EWSIPiSbUlg3424M9/exec';
+        const API_URL = '在這裡貼上你的API網址';
         
         let currentYear = new Date().getFullYear();
         let currentMonth = new Date().getMonth();
@@ -674,7 +682,7 @@
             else if (isWeekend) cell.classList.add('weekend');
             if (isToday) cell.classList.add('today');
             
-            const isAvailable = availData && (availData.allDay || (availData.shifts && availData.shifts.length > 0));
+            const isAvailable = availData && (availData.allDay || (availData.shifts && availData.shifts.length > 0) || availData.customTime);
             if (isAvailable) cell.classList.add('available');
             
             let html = `<div class="day-header"><div class="day-number">${date.getDate()}</div></div>`;
@@ -685,11 +693,16 @@
                 html += '<div class="shift-badges">';
                 if (availData.allDay) {
                     html += `<div class="available-icon">✓</div>`;
-                } else if (availData.shifts && availData.shifts.length > 0) {
-                    availData.shifts.forEach(shiftId => {
-                        const shift = shifts.find(s => s.id === shiftId);
-                        if (shift) html += `<span class="shift-badge" style="background: ${shift.color}; color: white;">${shift.name}</span>`;
-                    });
+                } else {
+                    if (availData.shifts && availData.shifts.length > 0) {
+                        availData.shifts.forEach(shiftId => {
+                            const shift = shifts.find(s => s.id === shiftId);
+                            if (shift) html += `<span class="shift-badge" style="background: ${shift.color}; color: white;">${shift.name}</span>`;
+                        });
+                    }
+                    if (availData.customTime) {
+                        html += `<span class="shift-badge" style="background: #999; color: white;">${availData.customTime}</span>`;
+                    }
                 }
                 html += '</div>';
             }
@@ -722,6 +735,23 @@
                     </div>
                 `;
             });
+            // 其他班別（自訂時間）
+            html += `
+                <div class="shift-option" id="customShiftOption" onclick="toggleShiftOption('custom')" style="border-left: 4px solid #999;">
+                    <div class="shift-option-checkbox"></div>
+                    <div class="shift-option-label">
+                        <div class="shift-option-title">🕐 其他班別</div>
+                        <div class="shift-option-time">自訂可上班時間</div>
+                    </div>
+                </div>
+                <div class="custom-shift-inputs" id="customShiftInputs">
+                    <div class="custom-time-row">
+                        <input type="time" class="custom-time-input" id="customStartTime" value="12:00">
+                        <span class="custom-time-separator">～</span>
+                        <input type="time" class="custom-time-input" id="customEndTime" value="18:00">
+                    </div>
+                </div>
+            `;
             container.innerHTML = html;
         }
 
@@ -732,13 +762,21 @@
             document.getElementById('shiftModalDate').textContent = `${dateStr} (週${dayOfWeek})`;
             renderShiftOptions();
             
-            const data = availableDates[dateStr] || { allDay: false, shifts: [] };
+            const data = availableDates[dateStr] || { allDay: false, shifts: [], customTime: '' };
             if (data.allDay) document.getElementById('allDayOption').classList.add('selected');
             if (data.shifts) {
                 data.shifts.forEach(shiftId => {
                     const el = document.getElementById(`shift_${shiftId}_option`);
                     if (el) el.classList.add('selected');
                 });
+            }
+            // 恢復自訂時間
+            if (data.customTime) {
+                document.getElementById('customShiftOption').classList.add('selected');
+                document.getElementById('customShiftInputs').classList.add('show');
+                const [start, end] = data.customTime.split('-');
+                if (start) document.getElementById('customStartTime').value = start;
+                if (end) document.getElementById('customEndTime').value = end;
             }
             document.getElementById('shiftModal').classList.add('show');
         }
@@ -752,12 +790,26 @@
             if (optionId === 'allDay') {
                 const option = document.getElementById('allDayOption');
                 if (!option.classList.contains('selected')) {
+                    // 取消其他選項
                     shifts.forEach(shift => {
                         const el = document.getElementById(`shift_${shift.id}_option`);
                         if (el) el.classList.remove('selected');
                     });
+                    document.getElementById('customShiftOption').classList.remove('selected');
+                    document.getElementById('customShiftInputs').classList.remove('show');
                 }
                 option.classList.toggle('selected');
+            } else if (optionId === 'custom') {
+                // 自訂班別
+                document.getElementById('allDayOption').classList.remove('selected');
+                const option = document.getElementById('customShiftOption');
+                const inputs = document.getElementById('customShiftInputs');
+                option.classList.toggle('selected');
+                if (option.classList.contains('selected')) {
+                    inputs.classList.add('show');
+                } else {
+                    inputs.classList.remove('show');
+                }
             } else {
                 document.getElementById('allDayOption').classList.remove('selected');
                 const option = document.getElementById(`shift_${optionId}_option`);
@@ -767,17 +819,39 @@
 
         function confirmShiftSelection() {
             const allDaySelected = document.getElementById('allDayOption').classList.contains('selected');
+            const customSelected = document.getElementById('customShiftOption').classList.contains('selected');
             const selectedShifts = [];
             shifts.forEach(shift => {
                 const el = document.getElementById(`shift_${shift.id}_option`);
                 if (el && el.classList.contains('selected')) selectedShifts.push(shift.id);
             });
             
-            if (allDaySelected || selectedShifts.length > 0) {
-                availableDates[currentEditingDate] = { allDay: allDaySelected, shifts: selectedShifts };
+            // 取得自訂時間
+            let customTime = '';
+            if (customSelected) {
+                const startTime = document.getElementById('customStartTime').value;
+                const endTime = document.getElementById('customEndTime').value;
+                if (startTime && endTime) {
+                    customTime = `${startTime}-${endTime}`;
+                }
+            }
+            
+            if (allDaySelected || selectedShifts.length > 0 || customTime) {
+                availableDates[currentEditingDate] = { 
+                    allDay: allDaySelected, 
+                    shifts: selectedShifts,
+                    customTime: customTime
+                };
                 let msg = '✅ 已標記可上班: ';
                 if (allDaySelected) msg += '整天';
-                else msg += selectedShifts.map(id => shifts.find(s => s.id === id)?.name || id).join('+');
+                else {
+                    const parts = [];
+                    if (selectedShifts.length > 0) {
+                        parts.push(selectedShifts.map(id => shifts.find(s => s.id === id)?.name || id).join('+'));
+                    }
+                    if (customTime) parts.push(customTime);
+                    msg += parts.join(', ');
+                }
                 showToast(msg);
             } else {
                 delete availableDates[currentEditingDate];
@@ -850,8 +924,15 @@
                     const dayOfWeek = ['日', '一', '二', '三', '四', '五', '六'][date.getDay()];
                     const data = availableDates[dateStr];
                     let shiftDisplay = '整天';
-                    if (!data.allDay && data.shifts && data.shifts.length > 0) {
-                        shiftDisplay = data.shifts.map(id => shifts.find(s => s.id === id)?.name || id).join('+');
+                    if (!data.allDay) {
+                        const parts = [];
+                        if (data.shifts && data.shifts.length > 0) {
+                            parts.push(data.shifts.map(id => shifts.find(s => s.id === id)?.name || id).join('+'));
+                        }
+                        if (data.customTime) {
+                            parts.push(data.customTime);
+                        }
+                        if (parts.length > 0) shiftDisplay = parts.join(', ');
                     }
                     return { date: dateStr, dayOfWeek, shiftDisplay };
                 });
@@ -875,12 +956,18 @@
             let availabilityArr = [];
             Object.keys(availableDates).sort().forEach(dateStr => {
                 const data = availableDates[dateStr];
-                if (data && (data.allDay || (data.shifts && data.shifts.length > 0))) {
+                if (data && (data.allDay || (data.shifts && data.shifts.length > 0) || data.customTime)) {
                     if (data.allDay) {
                         availabilityArr.push(`${dateStr}(整天)`);
                     } else {
-                        const shiftNames = data.shifts.map(id => shifts.find(s => s.id === id)?.name || id).join('+');
-                        availabilityArr.push(`${dateStr}(${shiftNames})`);
+                        const parts = [];
+                        if (data.shifts && data.shifts.length > 0) {
+                            parts.push(data.shifts.map(id => shifts.find(s => s.id === id)?.name || id).join('+'));
+                        }
+                        if (data.customTime) {
+                            parts.push(data.customTime);
+                        }
+                        availabilityArr.push(`${dateStr}(${parts.join(', ')})`);
                     }
                 }
             });
