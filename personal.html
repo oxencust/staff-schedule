@@ -916,7 +916,7 @@
             const availableList = Object.keys(availableDates)
                 .filter(dateStr => {
                     const data = availableDates[dateStr];
-                    return data && (data.allDay || (data.shifts && data.shifts.length > 0));
+                    return data && (data.allDay || (data.shifts && data.shifts.length > 0) || data.customTime);
                 })
                 .sort()
                 .map(dateStr => {
