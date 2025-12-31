@@ -749,9 +749,9 @@
             updateStats();
         }
         
-        // 計算工時（扣除休息時間）
+        // 計算工時（返回詳細資訊）
         function calculateWorkHours(timeStr) {
-            if (!timeStr || !timeStr.includes('-')) return 0;
+            if (!timeStr || !timeStr.includes('-')) return { rawHours: 0, breakMinutes: 0, netHours: 0 };
             const [start, end] = timeStr.split('-');
             const [startH, startM] = start.split(':').map(Number);
             const [endH, endM] = end.split(':').map(Number);
@@ -759,18 +759,20 @@
             let totalMinutes = (endH * 60 + endM) - (startH * 60 + startM);
             if (totalMinutes < 0) totalMinutes += 24 * 60; // 跨日
             
-            const totalHours = totalMinutes / 60;
+            const rawHours = totalMinutes / 60;
             
             // 扣除休息時間：每4小時休30分鐘，9小時以上休1小時
             let breakMinutes = 0;
-            if (totalHours >= 9) {
+            if (rawHours >= 9) {
                 breakMinutes = 60; // 9小時以上休1小時
-            } else if (totalHours >= 4) {
+            } else if (rawHours >= 4) {
                 breakMinutes = 30; // 4小時以上休30分鐘
             }
             
             const netMinutes = totalMinutes - breakMinutes;
-            return Math.max(0, netMinutes / 60);
+            const netHours = Math.max(0, netMinutes / 60);
+            
+            return { rawHours, breakMinutes, netHours };
         }
         
         function updateStats() {
@@ -783,7 +785,7 @@
             
             // 初始化所有員工
             staffList.forEach(staff => {
-                stats[staff.name] = { days: 0, hours: 0, overtime: 0, shifts: {} };
+                stats[staff.name] = { days: 0, rawHours: 0, breakMinutes: 0, netHours: 0, overtime: 0, shifts: {}, break30: 0, break60: 0 };
             });
             
             // 計算排班資料
@@ -793,16 +795,22 @@
                 const daySchedule = schedule[dateStr];
                 daySchedule.forEach(item => {
                     if (!stats[item.staffName]) {
-                        stats[item.staffName] = { days: 0, hours: 0, overtime: 0, shifts: {} };
+                        stats[item.staffName] = { days: 0, rawHours: 0, breakMinutes: 0, netHours: 0, overtime: 0, shifts: {}, break30: 0, break60: 0 };
                     }
                     
                     const shift = shifts.find(s => s.id === item.shiftId);
-                    const workHours = shift ? calculateWorkHours(shift.time) : 0;
+                    const workInfo = shift ? calculateWorkHours(shift.time) : { rawHours: 0, breakMinutes: 0, netHours: 0 };
                     const overtime = item.overtime || 0;
                     
                     stats[item.staffName].days += 1;
-                    stats[item.staffName].hours += workHours;
+                    stats[item.staffName].rawHours += workInfo.rawHours;
+                    stats[item.staffName].breakMinutes += workInfo.breakMinutes;
+                    stats[item.staffName].netHours += workInfo.netHours;
                     stats[item.staffName].overtime += overtime;
+                    
+                    // 統計休息次數
+                    if (workInfo.breakMinutes === 30) stats[item.staffName].break30 += 1;
+                    if (workInfo.breakMinutes === 60) stats[item.staffName].break60 += 1;
                     
                     // 統計各班別次數
                     const shiftName = shift ? shift.name : item.shiftId;
@@ -821,8 +829,18 @@
                     const s = stats[name];
                     if (s.days === 0) return;
                     
-                    const totalHours = s.hours + s.overtime;
+                    const totalHours = s.netHours + s.overtime;
+                    const breakHours = s.breakMinutes / 60;
                     const shiftSummary = Object.entries(s.shifts).map(([k, v]) => `${k}×${v}`).join('、');
+                    
+                    // 休息次數明細
+                    let breakDetail = '';
+                    if (s.break30 > 0 || s.break60 > 0) {
+                        const parts = [];
+                        if (s.break30 > 0) parts.push(`30分×${s.break30}`);
+                        if (s.break60 > 0) parts.push(`60分×${s.break60}`);
+                        breakDetail = parts.join('、');
+                    }
                     
                     html += `<div class="stats-card">
                         <div class="staff-name">${name}</div>
@@ -831,14 +849,26 @@
                             <span class="stats-value highlight">${s.days} 天</span>
                         </div>
                         <div class="stats-row">
-                            <span class="stats-label">工作時數</span>
-                            <span class="stats-value">${s.hours.toFixed(1)} 小時</span>
+                            <span class="stats-label">班別時長</span>
+                            <span class="stats-value">${s.rawHours.toFixed(1)} 小時</span>
+                        </div>
+                        <div class="stats-row">
+                            <span class="stats-label">休息時間</span>
+                            <span class="stats-value" style="color: #f59e0b;">-${breakHours.toFixed(1)} 小時</span>
+                        </div>
+                        ${breakDetail ? `<div class="stats-row">
+                            <span class="stats-label" style="font-size: 11px; color: #999;">休息明細</span>
+                            <span class="stats-value" style="font-size: 11px; color: #f59e0b;">${breakDetail}</span>
+                        </div>` : ''}
+                        <div class="stats-row">
+                            <span class="stats-label">實際工時</span>
+                            <span class="stats-value">${s.netHours.toFixed(1)} 小時</span>
                         </div>
                         ${s.overtime > 0 ? `<div class="stats-row">
                             <span class="stats-label">加班時數</span>
-                            <span class="stats-value">+${s.overtime} 小時</span>
+                            <span class="stats-value" style="color: #10b981;">+${s.overtime} 小時</span>
                         </div>` : ''}
-                        <div class="stats-row">
+                        <div class="stats-row" style="margin-top: 6px; padding-top: 6px; border-top: 1px solid #ddd;">
                             <span class="stats-label">總計時數</span>
                             <span class="stats-value highlight">${totalHours.toFixed(1)} 小時</span>
                         </div>
