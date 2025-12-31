@@ -879,7 +879,7 @@
                 else if (!isWeekend) {
                     workDays++;
                     const data = availableDates[dateStr];
-                    if (data && (data.allDay || (data.shifts && data.shifts.length > 0))) availableCount++;
+                    if (data && (data.allDay || (data.shifts && data.shifts.length > 0) || data.customTime)) availableCount++;
                 }
             }
             
