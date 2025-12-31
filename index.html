@@ -765,7 +765,7 @@
             let breakMinutes = 0;
             if (rawHours >= 9) {
                 breakMinutes = 60; // 9小時以上休1小時
-            } else if (rawHours >= 4) {
+            } else if (rawHours > 4) {
                 breakMinutes = 30; // 4小時以上休30分鐘
             }
             
