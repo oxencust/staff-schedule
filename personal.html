@@ -568,11 +568,30 @@
         </div>
     </div>
 
+    <!-- 加班回填 Modal -->
+    <div class="modal-overlay" id="overtimeModal">
+        <div class="modal" style="max-width: 400px;">
+            <div class="modal-header" style="background: linear-gradient(135deg, #f59e0b, #d97706); color: white;">
+                ⏰ 回填上月加班時間
+            </div>
+            <div class="modal-content" style="padding: 15px;">
+                <div style="background: #fef3c7; border-radius: 8px; padding: 12px; margin-bottom: 15px; font-size: 13px; color: #92400e;">
+                    ⚠️ 請於 <strong>4 號前</strong>完成回填，逾時不候！
+                </div>
+                <div id="overtimeList" style="max-height: 300px; overflow-y: auto;"></div>
+            </div>
+            <div class="modal-buttons">
+                <button class="modal-btn modal-btn-cancel" onclick="closeOvertimeModal()">稍後填寫</button>
+                <button class="modal-btn modal-btn-confirm" onclick="submitOvertime()">確認送出</button>
+            </div>
+        </div>
+    </div>
+
     <div class="toast" id="toast"></div>
 
     <script>
         // ============ 設定區 ============
-        const API_URL = 'https://script.google.com/macros/s/AKfycby0watlLwAe2No5OUpIsAtGRX41gAHirxxknEVCGGQ-AHafDo8-uJFGW5G1j_pBIsPr/exec';
+        const API_URL = 'https://script.google.com/macros/s/AKfycbyjwA3b_1BGTI8ZBAgXF7paB9vppi1_wTPn6s81HJkQR1AIdzFZpx1EPcQQGAnrhuk/exec';
         
         let currentYear = new Date().getFullYear();
         let currentMonth = new Date().getMonth();
@@ -601,7 +620,166 @@
             
             document.getElementById('loadingScreen').classList.add('hidden');
             document.getElementById('mainContent').style.display = 'block';
+            
+            // 檢查是否需要回填加班（1-4號期間）
+            if (staffName) {
+                checkOvertimeReminder();
+            }
         };
+        
+        // ============ 加班回填功能 ============
+        let pendingOvertimes = []; // 待回填的加班記錄
+        
+        async function checkOvertimeReminder() {
+            const today = new Date();
+            const dayOfMonth = today.getDate();
+            
+            // 只在 1-4 號顯示提醒
+            if (dayOfMonth > 4) return;
+            
+            // 計算上個月
+            let lastMonth = today.getMonth() - 1;
+            let lastYear = today.getFullYear();
+            if (lastMonth < 0) {
+                lastMonth = 11;
+                lastYear--;
+            }
+            
+            // 從 API 獲取上月需要回填的加班記錄
+            try {
+                const monthStr = `${lastYear}-${String(lastMonth + 1).padStart(2, '0')}`;
+                const res = await fetch(API_URL + '?action=getPendingOvertime&staff=' + encodeURIComponent(staffName) + '&month=' + monthStr);
+                const data = await res.json();
+                
+                if (data.success && data.records && data.records.length > 0) {
+                    pendingOvertimes = data.records;
+                    showOvertimeModal(lastYear, lastMonth + 1);
+                }
+            } catch (e) {
+                console.log('檢查加班回填失敗', e);
+                // 如果 API 失敗，可以從 localStorage 讀取
+                const localOvertimes = localStorage.getItem('pendingOvertimes_' + staffName);
+                if (localOvertimes) {
+                    pendingOvertimes = JSON.parse(localOvertimes);
+                    if (pendingOvertimes.length > 0) {
+                        const lastMonth = new Date();
+                        lastMonth.setMonth(lastMonth.getMonth() - 1);
+                        showOvertimeModal(lastMonth.getFullYear(), lastMonth.getMonth() + 1);
+                    }
+                }
+            }
+        }
+        
+        function showOvertimeModal(year, month) {
+            const container = document.getElementById('overtimeList');
+            const dayNames = ['日', '一', '二', '三', '四', '五', '六'];
+            
+            let html = `<p style="font-size: 13px; color: #666; margin-bottom: 12px;">您在 ${year}/${month} 月有 <strong>${pendingOvertimes.length}</strong> 天加班尚未填寫時間：</p>`;
+            
+            pendingOvertimes.forEach((record, index) => {
+                const date = new Date(record.date);
+                const dayOfWeek = dayNames[date.getDay()];
+                
+                html += `<div class="overtime-item" style="background:#f9fafb;border-radius:8px;padding:12px;margin-bottom:10px;border-left:3px solid #f59e0b;">
+                    <div style="font-weight:600;font-size:14px;margin-bottom:8px;">
+                        ${record.date} (${dayOfWeek}) - ${record.shiftName}
+                    </div>
+                    <div style="display:flex;align-items:center;gap:10px;">
+                        <span style="font-size:12px;color:#666;">加班時間：</span>
+                        <input type="time" class="overtime-start" data-index="${index}" 
+                            value="${record.suggestedStart || ''}" 
+                            style="padding:6px 10px;border:1px solid #ddd;border-radius:6px;font-size:14px;">
+                        <span>到</span>
+                        <input type="time" class="overtime-end" data-index="${index}" 
+                            value="${record.suggestedEnd || ''}" 
+                            style="padding:6px 10px;border:1px solid #ddd;border-radius:6px;font-size:14px;">
+                    </div>
+                    <div style="margin-top:8px;">
+                        <label style="font-size:12px;color:#666;display:flex;align-items:center;gap:6px;">
+                            <input type="checkbox" class="no-overtime" data-index="${index}" 
+                                onchange="toggleOvertimeInputs(this, ${index})">
+                            當天無加班
+                        </label>
+                    </div>
+                </div>`;
+            });
+            
+            container.innerHTML = html;
+            document.getElementById('overtimeModal').classList.add('show');
+        }
+        
+        function toggleOvertimeInputs(checkbox, index) {
+            const startInput = document.querySelector(`.overtime-start[data-index="${index}"]`);
+            const endInput = document.querySelector(`.overtime-end[data-index="${index}"]`);
+            if (startInput && endInput) {
+                startInput.disabled = checkbox.checked;
+                endInput.disabled = checkbox.checked;
+                if (checkbox.checked) {
+                    startInput.value = '';
+                    endInput.value = '';
+                }
+            }
+        }
+        
+        function closeOvertimeModal() {
+            document.getElementById('overtimeModal').classList.remove('show');
+        }
+        
+        async function submitOvertime() {
+            const submissions = [];
+            let hasError = false;
+            
+            pendingOvertimes.forEach((record, index) => {
+                const noOvertime = document.querySelector(`.no-overtime[data-index="${index}"]`)?.checked;
+                const startTime = document.querySelector(`.overtime-start[data-index="${index}"]`)?.value;
+                const endTime = document.querySelector(`.overtime-end[data-index="${index}"]`)?.value;
+                
+                if (noOvertime) {
+                    submissions.push({
+                        date: record.date,
+                        noOvertime: true
+                    });
+                } else if (startTime && endTime) {
+                    submissions.push({
+                        date: record.date,
+                        startTime,
+                        endTime,
+                        noOvertime: false
+                    });
+                } else {
+                    hasError = true;
+                }
+            });
+            
+            if (hasError) {
+                showToast('請填寫所有加班時間或勾選「無加班」');
+                return;
+            }
+            
+            // 送出到 API
+            try {
+                const payload = {
+                    staff: staffName,
+                    submissions
+                };
+                const res = await fetch(API_URL + '?action=submitOvertime&data=' + encodeURIComponent(JSON.stringify(payload)));
+                const data = await res.json();
+                
+                if (data.success) {
+                    showToast('✅ 加班時間已送出，等待審核');
+                    pendingOvertimes = [];
+                    localStorage.removeItem('pendingOvertimes_' + staffName);
+                    closeOvertimeModal();
+                } else {
+                    showToast('❌ 送出失敗：' + (data.error || ''));
+                }
+            } catch (e) {
+                // 儲存到 localStorage 作為備份
+                localStorage.setItem('overtimeSubmissions_' + staffName, JSON.stringify(submissions));
+                showToast('⚠️ 網路異常，已暫存本地，請稍後重試');
+                closeOvertimeModal();
+            }
+        }
 
         async function loadShifts() {
             if (!API_URL) return;
