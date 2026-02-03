@@ -509,7 +509,7 @@
     <script>
         // ============ 設定區（請在這裡修改）============
         const API_URL = 'https://script.google.com/macros/s/AKfycbyjwA3b_1BGTI8ZBAgXF7paB9vppi1_wTPn6s81HJkQR1AIdzFZpx1EPcQQGAnrhuk/exec';
-        const CALENDAR_ID = 'cbe9767d9958cfec6b2d072de4190967a66253aebb53541f0502211c18a91917@group.calendar.google.com';  // Google 日曆 ID（選填），格式：xxx@group.calendar.google.com
+        const CALENDAR_ID = '';  // Google 日曆 ID（選填），格式：xxx@group.calendar.google.com
         
         let staffList = [];
         let shifts = [];
@@ -579,7 +579,7 @@
                     <td data-label="排班連結"><a href="${staff.link}" target="_blank" class="staff-link">${staff.link}</a><button class="copy-btn" onclick="copyLink('${staff.link}')">複製</button></td>
                     <td data-label="可上班時間" class="availability-text">${staff.availability || '尚未填寫'}</td>
                     <td data-label="總天數" class="total-days">${staff.totalDays || 0}</td>
-                    <td data-label="送出時間" class="submit-time">${staff.submitTime || '-'}</td>
+                    <td data-label="送出時間" class="submit-time">${formatDateTime(staff.submitTime)}</td>
                     <td data-label="" class="action-cell">
                         <div style="display:flex;gap:8px;">
                             <button class="btn btn-secondary" style="font-size:11px;padding:4px 10px;" onclick="editStaffType('${staff.name}', '${staffType}')">編輯</button>
@@ -1384,6 +1384,19 @@
         async function refreshData() { showToast('🔄 重新整理...'); await loadAllData(); holidays = await fetchHolidays(currentYear); generateCalendar(); showToast('✅ 已更新'); }
 
         function formatDate(date) { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`; }
+        function formatDateTime(str) {
+            if (!str || str === '-') return '-';
+            try {
+                const d = new Date(str);
+                if (isNaN(d.getTime())) return str;
+                const yyyy = d.getFullYear();
+                const mm = String(d.getMonth() + 1).padStart(2, '0');
+                const dd = String(d.getDate()).padStart(2, '0');
+                const hh = String(d.getHours()).padStart(2, '0');
+                const mi = String(d.getMinutes()).padStart(2, '0');
+                return `${yyyy}-${mm}-${dd} ${hh}:${mi}`;
+            } catch (e) { return str; }
+        }
         function showToast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 3000); }
 
         // ============ 加班審核功能 ============
