@@ -423,7 +423,6 @@
                     <button class="btn btn-secondary" onclick="refreshData()">🔄 重新整理</button>
                     <button class="btn btn-primary" onclick="saveToSheet()">💾 儲存</button>
                     <button class="btn btn-export" onclick="exportSchedule()">📤 匯出</button>
-                    <button class="btn" style="background:#8b5cf6;color:white;" onclick="syncToCalendar()">📆 同步日曆</button>
                     <button class="btn btn-danger" onclick="clearSchedule()">🗑️ 清除</button>
                 </div>
             </div>
@@ -508,8 +507,7 @@
 
     <script>
         // ============ 設定區（請在這裡修改）============
-        const API_URL = 'https://script.google.com/macros/s/AKfycbyjwA3b_1BGTI8ZBAgXF7paB9vppi1_wTPn6s81HJkQR1AIdzFZpx1EPcQQGAnrhuk/exec';
-        const CALENDAR_ID = '';  // Google 日曆 ID（選填），格式：xxx@group.calendar.google.com
+        const API_URL = 'AKfycbyjwA3b_1BGTI8ZBAgXF7paB9vppi1_wTPn6s81HJkQR1AIdzFZpx1EPcQQGAnrhuk/exec';
         
         let staffList = [];
         let shifts = [];
@@ -520,13 +518,38 @@
         let currentEditingDate = null;
 
         window.onload = async function() {
-            loadLocalSchedule();
             await loadAllData();
             holidays = await fetchHolidays(currentYear);
+            
+            // 優先從 API 載入排班，失敗才用 localStorage
+            const loaded = await loadScheduleFromAPI();
+            if (!loaded) {
+                loadLocalSchedule();
+            }
+            
             generateCalendar();
             updateLegend();
             updateApiStatus();
         };
+        
+        // 從 API 載入排班資料
+        async function loadScheduleFromAPI() {
+            if (!API_URL) return false;
+            
+            try {
+                const monthStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
+                const res = await fetch(API_URL + '?action=getSchedules&month=' + monthStr);
+                const data = await res.json();
+                
+                if (data.success && data.schedules) {
+                    schedule = data.schedules;
+                    return Object.keys(schedule).length > 0;
+                }
+            } catch (e) {
+                console.error('從 API 載入排班失敗', e);
+            }
+            return false;
+        }
         
         async function updateApiStatus() {
             const status = document.getElementById('apiStatus');
@@ -1379,8 +1402,18 @@
             }
         }
 
-        function prevMonth() { currentMonth--; if (currentMonth < 0) { currentMonth = 11; currentYear--; fetchHolidays(currentYear).then(h => { holidays = h; generateCalendar(); }); } else generateCalendar(); }
-        function nextMonth() { currentMonth++; if (currentMonth > 11) { currentMonth = 0; currentYear++; fetchHolidays(currentYear).then(h => { holidays = h; generateCalendar(); }); } else generateCalendar(); }
+        async function prevMonth() { 
+            currentMonth--; 
+            if (currentMonth < 0) { currentMonth = 11; currentYear--; holidays = await fetchHolidays(currentYear); } 
+            await loadScheduleFromAPI();
+            generateCalendar(); 
+        }
+        async function nextMonth() { 
+            currentMonth++; 
+            if (currentMonth > 11) { currentMonth = 0; currentYear++; holidays = await fetchHolidays(currentYear); } 
+            await loadScheduleFromAPI();
+            generateCalendar(); 
+        }
         async function refreshData() { showToast('🔄 重新整理...'); await loadAllData(); holidays = await fetchHolidays(currentYear); generateCalendar(); showToast('✅ 已更新'); }
 
         function formatDate(date) { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`; }
@@ -1533,37 +1566,6 @@
                 }
             } catch (e) {
                 showToast('❌ 儲存失敗');
-            }
-        }
-        
-        // ============ Google 日曆同步 ============
-        async function syncToCalendar() {
-            if (!CALENDAR_ID) {
-                showToast('⚠️ 請先在程式碼設定區填入 CALENDAR_ID');
-                return;
-            }
-            
-            if (!confirm('確定要同步排班到 Google 日曆？\n（會覆蓋現有事件）')) return;
-            
-            showToast('📆 同步中...');
-            
-            try {
-                const payload = {
-                    calendarId: CALENDAR_ID,
-                    schedules: schedule,
-                    shifts: shifts
-                };
-                
-                const res = await fetch(API_URL + '?action=syncToCalendar&data=' + encodeURIComponent(JSON.stringify(payload)));
-                const data = await res.json();
-                
-                if (data.success) {
-                    showToast('✅ 已同步到 Google 日曆');
-                } else {
-                    showToast('❌ 同步失敗：' + (data.error || ''));
-                }
-            } catch (e) {
-                showToast('❌ 同步失敗');
             }
         }
     </script>
