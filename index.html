@@ -581,8 +581,10 @@
                     <td data-label="總天數" class="total-days">${staff.totalDays || 0}</td>
                     <td data-label="送出時間" class="submit-time">${staff.submitTime || '-'}</td>
                     <td data-label="" class="action-cell">
-                        <button class="btn btn-secondary" style="font-size:11px;padding:4px 8px;margin-right:4px;" onclick="editStaffType('${staff.name}', '${staffType}')">編輯</button>
-                        <button class="btn btn-secondary delete-btn" onclick="deleteStaff('${staff.name}')">刪除</button>
+                        <div style="display:flex;gap:8px;">
+                            <button class="btn btn-secondary" style="font-size:11px;padding:4px 10px;" onclick="editStaffType('${staff.name}', '${staffType}')">編輯</button>
+                            <button class="btn btn-secondary" style="font-size:11px;padding:4px 10px;color:#ef4444;" onclick="deleteStaff('${staff.name}')">刪除</button>
+                        </div>
                     </td>
                 </tr>`;
             });
