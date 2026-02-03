@@ -614,7 +614,13 @@
             
             await loadShifts();
             holidays = await fetchHolidays(currentYear);
-            loadLocalData();
+            
+            // 優先從 API 載入已送出的資料，否則從 localStorage 載入草稿
+            const loaded = await loadSavedAvailability();
+            if (!loaded) {
+                loadLocalData();
+            }
+            
             generateCalendar();
             updateStats();
             
@@ -1080,6 +1086,87 @@
 
         function saveLocalData() { localStorage.setItem(`available_${staffName}`, JSON.stringify(availableDates)); }
         function loadLocalData() { const saved = localStorage.getItem(`available_${staffName}`); if (saved) availableDates = JSON.parse(saved); }
+        
+        // 從 API 載入已送出的可排班時間
+        async function loadSavedAvailability() {
+            if (!API_URL || !staffName) return false;
+            
+            try {
+                const res = await fetch(API_URL + '?action=getStaff');
+                const data = await res.json();
+                
+                if (!data.success || !data.staff) return false;
+                
+                // 找到自己的資料
+                const myData = data.staff.find(s => s.name === staffName);
+                if (!myData || !myData.availability) return false;
+                
+                // 解析 availability 文字格式
+                // 格式: "2026-02-01(整天)\n2026-02-02(6午班+8整天班)\n2026-02-03(6午班, 早上10點)"
+                const lines = myData.availability.split('\n').filter(line => line.trim());
+                if (lines.length === 0) return false;
+                
+                // 取得所有班別名稱（用於判斷是班別還是自定義時間）
+                const shiftNames = shifts.map(s => s.name);
+                
+                availableDates = {};
+                
+                lines.forEach(line => {
+                    // 解析格式: "2026-02-01(整天)" 或 "2026-02-01(6午班+8整天班, 早上10點)"
+                    const match = line.match(/^(\d{4}-\d{2}-\d{2})\((.+)\)$/);
+                    if (!match) return;
+                    
+                    const dateStr = match[1];
+                    const content = match[2];
+                    
+                    if (content === '整天') {
+                        availableDates[dateStr] = { allDay: true, shifts: [], customTime: '' };
+                    } else {
+                        // 解析班別和自定義時間
+                        // 格式可能是: "6午班+8整天班, 早上10點" 或 "6午班+8整天班" 或 "早上10點"
+                        const parts = content.split(', ');
+                        
+                        let shiftIds = [];
+                        let customTime = '';
+                        
+                        parts.forEach(part => {
+                            // 檢查是否包含班別（用+分割後看是否有已知班別）
+                            const possibleShifts = part.split('+');
+                            const isShiftPart = possibleShifts.some(name => 
+                                shiftNames.includes(name.trim())
+                            );
+                            
+                            if (isShiftPart) {
+                                // 這是班別部分
+                                possibleShifts.forEach(name => {
+                                    const shift = shifts.find(s => s.name === name.trim());
+                                    if (shift) shiftIds.push(shift.id);
+                                });
+                            } else {
+                                // 這是自定義時間
+                                customTime = part.trim();
+                            }
+                        });
+                        
+                        availableDates[dateStr] = { 
+                            allDay: false, 
+                            shifts: shiftIds, 
+                            customTime: customTime 
+                        };
+                    }
+                });
+                
+                // 顯示已載入提示
+                if (Object.keys(availableDates).length > 0) {
+                    showToast(`✅ 已載入先前送出的資料（${Object.keys(availableDates).length} 天）`);
+                }
+                
+                return Object.keys(availableDates).length > 0;
+            } catch (e) {
+                console.error('載入已存資料失敗', e);
+                return false;
+            }
+        }
 
         function clearAll() {
             if (!confirm('確定要清除所有標記嗎？')) return;
@@ -1155,7 +1242,12 @@
             
             try {
                 // 使用 GET + URL 參數方式避免 CORS 問題
-                const payload = encodeURIComponent(JSON.stringify({ staffName, availability: availabilityStr }));
+                const totalDays = availabilityArr.length;
+                const payload = encodeURIComponent(JSON.stringify({ 
+                    name: staffName, 
+                    availability: availabilityStr,
+                    totalDays: totalDays
+                }));
                 const res = await fetch(API_URL + '?action=updateAvailability&data=' + payload);
                 const data = await res.json();
                 showToast(data.success ? '✅ 已送出！' : '❌ 送出失敗：' + (data.error || ''));
