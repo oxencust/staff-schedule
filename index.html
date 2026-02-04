@@ -1559,12 +1559,14 @@
         }
 
         async function prevMonth() { 
+            showToast('⏳ 載入中...');
             currentMonth--; 
             if (currentMonth < 0) { currentMonth = 11; currentYear--; holidays = await fetchHolidays(currentYear); } 
             await loadScheduleFromAPI();
             generateCalendar(); 
         }
         async function nextMonth() { 
+            showToast('⏳ 載入中...');
             currentMonth++; 
             if (currentMonth > 11) { currentMonth = 0; currentYear++; holidays = await fetchHolidays(currentYear); } 
             await loadScheduleFromAPI();
