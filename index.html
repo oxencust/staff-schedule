@@ -69,7 +69,9 @@
         .staff-table { width: 100%; border-collapse: collapse; margin-top: 15px; }
         .staff-table th, .staff-table td { padding: 12px; text-align: left; border-bottom: 1px solid #e0e0e0; }
         .staff-table th { background: #f8f9fa; font-weight: 600; color: var(--green-dark); }
+        .staff-table th:first-child, .staff-table td:first-child { min-width: 80px; white-space: nowrap; }
         .staff-table tr:hover { background: #f8f9fa; }
+        .staff-table td[data-label="姓名"] strong { white-space: nowrap; }
         .staff-link { color: var(--green); text-decoration: none; font-size: 12px; word-break: break-all; }
         .copy-btn { padding: 4px 10px; background: var(--green-light); color: var(--green-dark); border: none; border-radius: 4px; cursor: pointer; font-size: 12px; margin-left: 8px; }
         .availability-text { font-size: 12px; color: #666; max-width: 250px; word-break: break-all; }
@@ -228,6 +230,7 @@
             .staff-table td[data-label="姓名"] strong {
                 font-size: 18px;
                 color: var(--green-dark);
+                white-space: nowrap;
             }
             .staff-table td[data-label="排班連結"] {
                 flex-direction: column;
@@ -516,7 +519,7 @@
 
     <script>
         // ============ 設定區（請在這裡修改）============
-        const API_URL = 'https://script.google.com/macros/s/AKfycbxP6vqD0rgbKHaLJ-39Ipg-NVblqTkSyc_wuzarhHLjWI15GxPaFFeSsfgX-y91ZzNrgA/exec';
+        const API_URL = 'https://script.google.com/macros/s/AKfycbz072OarRtqw0yhcxrfMEdIr_PcnUlgt3JpzTa9YfJHboH43ZSgcjuv1594tiStYHrPJA/exec';
         
         let staffList = [];
         let shifts = [];
