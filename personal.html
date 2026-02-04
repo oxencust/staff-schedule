@@ -464,6 +464,15 @@
         </nav>
 
         <div class="container">
+            <!-- 回填模式提示條 -->
+            <div id="overtimeModeBar" style="display: none; background: linear-gradient(135deg, #f59e0b, #d97706); color: white; padding: 12px 15px; border-radius: 10px; margin-bottom: 15px; text-align: center;">
+                <div style="font-weight: 600; margin-bottom: 5px;">📋 加班回填模式</div>
+                <div style="font-size: 12px; opacity: 0.9;">點選日曆上的日期回填加班時間</div>
+                <button onclick="exitOvertimeMode()" style="margin-top: 10px; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.5); color: white; padding: 6px 15px; border-radius: 20px; font-size: 12px; cursor: pointer;">
+                    ✓ 完成回填，返回排班
+                </button>
+            </div>
+            
             <div class="control-panel">
                 <div class="month-selector">
                     <button class="month-btn" onclick="previousMonth()">◀</button>
@@ -568,15 +577,63 @@
         </div>
     </div>
 
-    <!-- 加班回填 Modal -->
-    <div class="modal-overlay" id="overtimeModal">
+    <!-- 加班回填提醒 Modal -->
+    <div class="modal-overlay" id="overtimeReminderModal">
+        <div class="modal" style="max-width: 380px;">
+            <div class="modal-header" style="background: linear-gradient(135deg, #f59e0b, #d97706); color: white;">
+                ⚠️ 加班回填提醒
+            </div>
+            <div class="modal-content" style="padding: 20px; text-align: center;">
+                <div style="font-size: 48px; margin-bottom: 15px;">📋</div>
+                <div style="font-size: 15px; margin-bottom: 15px; line-height: 1.6;">
+                    請於 <strong style="color: #dc2626;">5 號前</strong>回填上月加班時間<br>
+                    <span style="color: #dc2626; font-weight: 600;">逾時不候！</span>
+                </div>
+                <div style="font-size: 13px; color: #666; background: #f3f4f6; padding: 12px; border-radius: 8px;">
+                    請在日曆上點選有加班的日期進行回填<br>
+                    （包含臨時上班）
+                </div>
+            </div>
+            <div class="modal-buttons">
+                <button class="modal-btn modal-btn-confirm" onclick="confirmOvertimeReminder()" style="width: 100%;">我知道了，開始回填</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 單筆加班回填 Modal -->
+    <div class="modal-overlay" id="overtimeFillModal">
+        <div class="modal" style="max-width: 350px;">
+            <div class="modal-header" style="background: linear-gradient(135deg, #f59e0b, #d97706); color: white;">
+                ⏰ 回填加班時間
+            </div>
+            <div class="modal-content" style="padding: 15px;">
+                <div id="overtimeFillDate" style="font-size: 16px; font-weight: 600; margin-bottom: 15px; text-align: center;"></div>
+                <div id="overtimeFillShift" style="font-size: 13px; color: #666; margin-bottom: 15px; text-align: center; padding: 10px; background: #f3f4f6; border-radius: 8px;"></div>
+                <div style="margin-bottom: 15px;">
+                    <label style="font-size: 13px; color: #666; display: block; margin-bottom: 8px;">加班時間</label>
+                    <div style="display: flex; align-items: center; gap: 10px; justify-content: center;">
+                        <select id="overtimeFillStart" style="padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; width: 100px;"></select>
+                        <span style="color: #666;">至</span>
+                        <select id="overtimeFillEnd" style="padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; width: 100px;"></select>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-buttons">
+                <button class="modal-btn modal-btn-cancel" onclick="closeOvertimeFillModal()">取消</button>
+                <button class="modal-btn modal-btn-confirm" onclick="submitSingleOvertime()">送出申請</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 舊的加班回填 Modal 保留但隱藏 -->
+    <div class="modal-overlay" id="overtimeModal" style="display:none;">
         <div class="modal" style="max-width: 400px;">
             <div class="modal-header" style="background: linear-gradient(135deg, #f59e0b, #d97706); color: white;">
                 ⏰ 回填上月加班時間
             </div>
             <div class="modal-content" style="padding: 15px;">
                 <div style="background: #fef3c7; border-radius: 8px; padding: 12px; margin-bottom: 15px; font-size: 13px; color: #92400e;">
-                    ⚠️ 請於 <strong>4 號前</strong>完成回填，逾時不候！
+                    ⚠️ 請於 <strong>5 號前</strong>完成回填，逾時不候！
                 </div>
                 <div id="overtimeList" style="max-height: 300px; overflow-y: auto;"></div>
             </div>
@@ -591,7 +648,7 @@
 
     <script>
         // ============ 設定區 ============
-        const API_URL = 'https://script.google.com/macros/s/AKfycbwQ4sgXoskark0l4iY7KqWiYPAfUDf00ZKqshOGvcGwI57r3cozOp2oysHtduZTqWje/exec';
+        const API_URL = 'https://script.google.com/macros/s/AKfycbz6PFNg028FY5mO5F6YA-4XoqDZBns6tiJlBVJ199gcKo-sSvbVvjPmsVyjBIdQG36x/exec';
         
         let currentYear = new Date().getFullYear();
         let currentMonth = new Date().getMonth();
@@ -600,6 +657,11 @@
         let staffName = '';
         let currentEditingDate = null;
         let shifts = [];
+        
+        // 加班回填相關
+        let isOvertimeMode = false;  // 是否在回填模式
+        let lastMonthSchedules = {};  // 上月排班資料
+        let currentOvertimeDate = null;  // 當前回填的日期
 
         window.onload = async function() {
             const urlParams = new URLSearchParams(window.location.search);
@@ -634,16 +696,35 @@
         };
         
         // ============ 加班回填功能 ============
-        let pendingOvertimes = []; // 待回填的加班記錄
         
         async function checkOvertimeReminder() {
             const today = new Date();
             const dayOfMonth = today.getDate();
             
-            // 只在 1-4 號顯示提醒
-            if (dayOfMonth > 4) return;
+            // 只在 1-5 號顯示提醒
+            if (dayOfMonth > 5) return;
+            
+            // 檢查是否已經確認過（本次 session）
+            const confirmed = sessionStorage.getItem('overtimeReminderConfirmed');
+            if (confirmed) return;
+            
+            // 顯示提醒 Modal
+            document.getElementById('overtimeReminderModal').classList.add('show');
+        }
+        
+        async function confirmOvertimeReminder() {
+            document.getElementById('overtimeReminderModal').classList.remove('show');
+            sessionStorage.setItem('overtimeReminderConfirmed', 'true');
+            
+            // 進入回填模式
+            await enterOvertimeMode();
+        }
+        
+        async function enterOvertimeMode() {
+            isOvertimeMode = true;
             
             // 計算上個月
+            const today = new Date();
             let lastMonth = today.getMonth() - 1;
             let lastYear = today.getFullYear();
             if (lastMonth < 0) {
@@ -651,30 +732,160 @@
                 lastYear--;
             }
             
-            // 從 API 獲取上月需要回填的加班記錄
+            // 切換到上月
+            currentYear = lastYear;
+            currentMonth = lastMonth;
+            
+            // 載入上月排班資料
+            await loadLastMonthSchedules();
+            
+            // 顯示回填模式提示條
+            document.getElementById('overtimeModeBar').style.display = 'block';
+            document.getElementById('staffNameDisplay').innerHTML = 
+                `<span class="staff-name">${staffName}</span> 點選日期回填<strong style="color:#f59e0b;">加班時間</strong>`;
+            
+            // 重新生成日曆
+            holidays = await fetchHolidays(currentYear);
+            generateCalendar();
+            updateStats();
+        }
+        
+        function exitOvertimeMode() {
+            isOvertimeMode = false;
+            
+            // 切換回當月
+            const today = new Date();
+            currentYear = today.getFullYear();
+            currentMonth = today.getMonth();
+            
+            // 隱藏回填模式提示條
+            document.getElementById('overtimeModeBar').style.display = 'none';
+            document.getElementById('staffNameDisplay').innerHTML = 
+                `<span class="staff-name">${staffName}</span> 請點選<strong>可以上班</strong>的日期`;
+            
+            // 重新生成日曆
+            fetchHolidays(currentYear).then(h => {
+                holidays = h;
+                generateCalendar();
+                updateStats();
+            });
+        }
+        
+        async function loadLastMonthSchedules() {
+            if (!API_URL) return;
+            
             try {
-                const monthStr = `${lastYear}-${String(lastMonth + 1).padStart(2, '0')}`;
-                const res = await fetch(API_URL + '?action=getPendingOvertime&staff=' + encodeURIComponent(staffName) + '&month=' + monthStr);
+                const monthStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
+                const res = await fetch(API_URL + '?action=getSchedules&month=' + monthStr);
                 const data = await res.json();
                 
-                if (data.success && data.records && data.records.length > 0) {
-                    pendingOvertimes = data.records;
-                    showOvertimeModal(lastYear, lastMonth + 1);
-                }
-            } catch (e) {
-                console.log('檢查加班回填失敗', e);
-                // 如果 API 失敗，可以從 localStorage 讀取
-                const localOvertimes = localStorage.getItem('pendingOvertimes_' + staffName);
-                if (localOvertimes) {
-                    pendingOvertimes = JSON.parse(localOvertimes);
-                    if (pendingOvertimes.length > 0) {
-                        const lastMonth = new Date();
-                        lastMonth.setMonth(lastMonth.getMonth() - 1);
-                        showOvertimeModal(lastMonth.getFullYear(), lastMonth.getMonth() + 1);
+                if (data.success && data.schedules) {
+                    // 過濾出自己的排班
+                    lastMonthSchedules = {};
+                    for (const dateStr in data.schedules) {
+                        const mySchedule = data.schedules[dateStr].find(s => s.staffName === staffName);
+                        if (mySchedule) {
+                            lastMonthSchedules[dateStr] = mySchedule;
+                        }
                     }
                 }
+            } catch (e) {
+                console.error('載入上月排班失敗', e);
             }
         }
+        
+        function openOvertimeFillModal(dateStr) {
+            currentOvertimeDate = dateStr;
+            const date = new Date(dateStr);
+            const dayOfWeek = ['日', '一', '二', '三', '四', '五', '六'][date.getDay()];
+            
+            document.getElementById('overtimeFillDate').textContent = `${dateStr} (週${dayOfWeek})`;
+            
+            // 檢查是否有排班
+            const schedule = lastMonthSchedules[dateStr];
+            if (schedule) {
+                const shift = shifts.find(s => s.id === schedule.shiftId);
+                const shiftInfo = shift ? `${shift.name} (${shift.time})` : schedule.shiftId;
+                document.getElementById('overtimeFillShift').innerHTML = `原班別：<strong>${shiftInfo}</strong>`;
+            } else {
+                document.getElementById('overtimeFillShift').innerHTML = `<strong style="color:#f59e0b;">臨時上班</strong>（原本無排班）`;
+            }
+            
+            // 生成時間選項
+            const startSelect = document.getElementById('overtimeFillStart');
+            const endSelect = document.getElementById('overtimeFillEnd');
+            
+            let options = '<option value="">請選擇</option>';
+            for (let h = 6; h <= 23; h++) {
+                for (let m = 0; m < 60; m += 30) {
+                    const time = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+                    options += `<option value="${time}">${time}</option>`;
+                }
+            }
+            
+            startSelect.innerHTML = options;
+            endSelect.innerHTML = options;
+            
+            document.getElementById('overtimeFillModal').classList.add('show');
+        }
+        
+        function closeOvertimeFillModal() {
+            document.getElementById('overtimeFillModal').classList.remove('show');
+            currentOvertimeDate = null;
+        }
+        
+        async function submitSingleOvertime() {
+            const startTime = document.getElementById('overtimeFillStart').value;
+            const endTime = document.getElementById('overtimeFillEnd').value;
+            
+            if (!startTime || !endTime) {
+                showToast('請選擇加班時間');
+                return;
+            }
+            
+            if (startTime >= endTime) {
+                showToast('結束時間必須大於開始時間');
+                return;
+            }
+            
+            // 取得原班別資訊
+            const schedule = lastMonthSchedules[currentOvertimeDate];
+            let shiftName = '臨時上班';
+            if (schedule) {
+                const shift = shifts.find(s => s.id === schedule.shiftId);
+                shiftName = shift ? shift.name : schedule.shiftId;
+            }
+            
+            showToast('📤 正在送出...');
+            
+            try {
+                const payload = {
+                    staff: staffName,
+                    submissions: [{
+                        date: currentOvertimeDate,
+                        shiftName: shiftName,
+                        startTime: startTime,
+                        endTime: endTime
+                    }]
+                };
+                
+                const res = await fetch(API_URL + '?action=submitOvertime&data=' + encodeURIComponent(JSON.stringify(payload)));
+                const data = await res.json();
+                
+                if (data.success) {
+                    showToast('✅ 加班申請已送出！');
+                    closeOvertimeFillModal();
+                } else {
+                    showToast('❌ 送出失敗：' + (data.error || ''));
+                }
+            } catch (e) {
+                console.error('送出失敗', e);
+                showToast('❌ 送出失敗，請檢查網路');
+            }
+        }
+        
+        // 保留舊的函數（向後相容）
+        let pendingOvertimes = [];
         
         function showOvertimeModal(year, month) {
             const container = document.getElementById('overtimeList');
@@ -859,13 +1070,46 @@
             const dateStr = formatDate(date);
             const isToday = dateStr === formatDate(new Date());
             const holidayInfo = holidays.find(h => h.date === dateStr);
-            const availData = availableDates[dateStr];
             
             if (!isCurrentMonth) cell.style.opacity = '0.5';
             if (holidayInfo) cell.classList.add('holiday');
             else if (isWeekend) cell.classList.add('weekend');
             if (isToday) cell.classList.add('today');
             
+            // 回填模式下的顯示
+            if (isOvertimeMode) {
+                const mySchedule = lastMonthSchedules[dateStr];
+                let html = `<div class="day-header"><div class="day-number">${date.getDate()}</div></div>`;
+                
+                if (holidayInfo) {
+                    html += `<span class="status-label holiday-label">${holidayInfo.name}</span>`;
+                } else if (isWeekend && !mySchedule) {
+                    html += `<span class="status-label weekend-label">休</span>`;
+                }
+                
+                if (mySchedule) {
+                    // 有排班：顯示班別
+                    const shift = shifts.find(s => s.id === mySchedule.shiftId);
+                    const shiftName = shift ? shift.name : mySchedule.shiftId;
+                    cell.style.background = '#fef3c7';
+                    cell.style.cursor = 'pointer';
+                    html += `<div style="font-size:11px;font-weight:500;color:#92400e;margin-top:2px;">${shiftName}</div>`;
+                    html += `<div style="font-size:10px;color:#666;">點擊回填加班</div>`;
+                } else if (isCurrentMonth && !holidayInfo) {
+                    // 無排班：也可以點擊填臨時上班
+                    cell.style.cursor = 'pointer';
+                    html += `<div style="font-size:10px;color:#999;margin-top:4px;">點擊填臨時加班</div>`;
+                }
+                
+                cell.innerHTML = html;
+                if (isCurrentMonth) {
+                    cell.onclick = () => openOvertimeFillModal(dateStr);
+                }
+                return cell;
+            }
+            
+            // 正常模式下的顯示
+            const availData = availableDates[dateStr];
             const isAvailable = availData && (availData.allDay || (availData.shifts && availData.shifts.length > 0) || availData.customTime);
             if (isAvailable) cell.classList.add('available');
             
