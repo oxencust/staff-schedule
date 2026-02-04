@@ -708,7 +708,7 @@
 
     <script>
         // ============ 設定區 ============
-        const API_URL = 'https://script.google.com/macros/s/AKfycbwp5Qs7neS0TBgsxQeGjGTa65M4crnMVP0kDCO5wXrJxIYcx-qSKsf9UkQ5vj_W6wsD_w/exec';
+        const API_URL = 'https://script.google.com/macros/s/AKfycbxhz9iG9dNvL374FXAWcCsyMd9qpgMd7hqx13Vw2x4fp9pWpK0AoOox6h2FPlyHOaCwJw/exec';
         
         let currentYear = new Date().getFullYear();
         let currentMonth = new Date().getMonth();
@@ -914,6 +914,7 @@
                 showToast('📤 送出中...');
                 
                 const payload = {
+                    action: 'submitLeave',
                     staff: staffName,
                     submissions: [{
                         date: dateStr,
@@ -924,7 +925,12 @@
                     }]
                 };
                 
-                const res = await fetch(API_URL + '?action=submitLeave&data=' + encodeURIComponent(JSON.stringify(payload)));
+                // 使用 POST
+                const res = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: JSON.stringify(payload)
+                });
                 const data = await res.json();
                 
                 if (data.success) {
@@ -1116,6 +1122,7 @@
             
             try {
                 const payload = {
+                    action: 'submitOvertime',
                     staff: staffName,
                     submissions: [{
                         date: currentOvertimeDate,
@@ -1126,7 +1133,12 @@
                     }]
                 };
                 
-                const res = await fetch(API_URL + '?action=submitOvertime&data=' + encodeURIComponent(JSON.stringify(payload)));
+                // 使用 POST
+                const res = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: JSON.stringify(payload)
+                });
                 const data = await res.json();
                 
                 if (data.success) {
@@ -1233,10 +1245,17 @@
             // 送出到 API
             try {
                 const payload = {
+                    action: 'submitOvertime',
                     staff: staffName,
                     submissions
                 };
-                const res = await fetch(API_URL + '?action=submitOvertime&data=' + encodeURIComponent(JSON.stringify(payload)));
+                
+                // 使用 POST
+                const res = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: JSON.stringify(payload)
+                });
                 const data = await res.json();
                 
                 if (data.success) {
@@ -1767,14 +1786,20 @@
             showToast('📤 正在送出...');
             
             try {
-                // 使用 GET + URL 參數方式避免 CORS 問題
                 const totalDays = availabilityArr.length;
-                const payload = encodeURIComponent(JSON.stringify({ 
+                const payload = { 
+                    action: 'updateAvailability',
                     name: staffName, 
                     availability: availabilityStr,
                     totalDays: totalDays
-                }));
-                const res = await fetch(API_URL + '?action=updateAvailability&data=' + payload);
+                };
+                
+                // 使用 POST 避免 URL 長度限制
+                const res = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: JSON.stringify(payload)
+                });
                 const data = await res.json();
                 showToast(data.success ? '✅ 已送出！' : '❌ 送出失敗：' + (data.error || ''));
             } catch (e) {
