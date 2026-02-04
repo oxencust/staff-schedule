@@ -387,6 +387,7 @@
         <div class="tab" onclick="switchTab('shifts')">🕐 班別設定</div>
         <div class="tab" onclick="switchTab('calendar')">📅 排班日曆</div>
         <div class="tab" onclick="switchTab('overtime')">⏰ 加班審核</div>
+        <div class="tab" onclick="switchTab('leave')">📝 請假審核</div>
     </div>
 
     <div class="tab-content active" id="tab-staff">
@@ -448,6 +449,20 @@
                 <p style="font-size: 13px; color: #666; margin-bottom: 15px;">審核員工回填的加班時間，通過後才計入工時統計</p>
                 <button class="btn btn-secondary" onclick="loadPendingOvertime()" style="margin-bottom: 15px;">🔄 重新整理</button>
                 <div id="overtimeReviewContainer">
+                    <div class="loading"><div class="spinner"></div>載入中...</div>
+                </div>
+            </div>
+            
+        </div>
+    </div>
+
+    <div class="tab-content" id="tab-leave">
+        <div class="container">
+            <div class="settings-panel">
+                <h3>📝 請假審核</h3>
+                <p style="font-size: 13px; color: #666; margin-bottom: 15px;">審核員工的請假申請，通過後會自動更新排班資料並扣除工時</p>
+                <button class="btn btn-secondary" onclick="loadPendingLeave()" style="margin-bottom: 15px;">🔄 重新整理</button>
+                <div id="leaveReviewContainer">
                     <div class="loading"><div class="spinner"></div>載入中...</div>
                 </div>
             </div>
@@ -519,7 +534,7 @@
 
     <script>
         // ============ 設定區（請在這裡修改）============
-        const API_URL = 'https://script.google.com/macros/s/AKfycbz072OarRtqw0yhcxrfMEdIr_PcnUlgt3JpzTa9YfJHboH43ZSgcjuv1594tiStYHrPJA/exec';
+        const API_URL = 'https://script.google.com/macros/s/AKfycbwp5Qs7neS0TBgsxQeGjGTa65M4crnMVP0kDCO5wXrJxIYcx-qSKsf9UkQ5vj_W6wsD_w/exec';
         
         let staffList = [];
         let shifts = [];
@@ -587,6 +602,7 @@
             document.getElementById('tab-' + tabId).classList.add('active');
             if (tabId === 'calendar') { generateCalendar(); updateLegend(); }
             if (tabId === 'overtime') { loadPendingOvertime(); }
+            if (tabId === 'leave') { loadPendingLeave(); }
         }
 
         async function loadAllData() { await loadStaff(); await loadShifts(); await loadStaffTypes(); }
@@ -1023,8 +1039,16 @@
                                 const otHours = calculateOvertimeHours(item.overtimeStart, item.overtimeEnd);
                                 overtimeDisplay = ` <span style="color:#f59e0b;">+${otHours}h⏳</span>`;
                             }
+                            
+                            // 請假申請標記（半天假情況）
+                            let leaveDisplay = '';
+                            if (item.leaveType && item.leaveHours && item.leaveHours > 0) {
+                                const leaveIcon = item.leaveType === '病假' ? '🏥' : item.leaveType === '事假' ? '📝' : item.leaveType === '特休' ? '🌴' : item.leaveType === '補休' ? '🔄' : '🎉';
+                                leaveDisplay = ` <span style="color:#9ca3af;">${leaveIcon}-${item.leaveHours}h</span>`;
+                            }
+                            
                             const timeHtml = shiftTime ? '<div class="time">' + shiftTime + '</div>' : '';
-                            html += '<div>' + item.staffName + ' ' + shiftName + note + overtimeDisplay + '</div>';
+                            html += '<div>' + item.staffName + ' ' + shiftName + note + overtimeDisplay + leaveDisplay + '</div>';
                             html += timeHtml;
                         }
                         
@@ -1148,10 +1172,18 @@
                             overtime = calculateOvertimeHours(item.overtimeStart, item.overtimeEnd);
                         }
                         
+                        // 檢查是否有請假申請通過（半天假情況）
+                        let appliedLeaveHours = 0;
+                        if (item.leaveType && item.leaveHours && item.leaveHours > 0) {
+                            appliedLeaveHours = Number(item.leaveHours) || 0;
+                            stats[item.staffName].leaveHours += appliedLeaveHours;
+                        }
+                        
                         stats[item.staffName].days += 1;
                         stats[item.staffName].rawHours += workInfo.rawHours;
                         stats[item.staffName].breakMinutes += workInfo.breakMinutes;
-                        stats[item.staffName].netHours += workInfo.netHours;
+                        // 實際工時 = 班別工時 - 請假時數
+                        stats[item.staffName].netHours += (workInfo.netHours - appliedLeaveHours);
                         stats[item.staffName].overtime += overtime;
                         
                         // 統計休息次數
@@ -1759,6 +1791,129 @@
                 if (data.success) {
                     showToast('✅ 已拒絕');
                     loadPendingOvertime();
+                } else {
+                    showToast('❌ 操作失敗');
+                }
+            } catch (e) {
+                showToast('❌ 操作失敗');
+            }
+        }
+        
+        // ============ 請假審核功能 ============
+        let pendingLeaves = [];
+        
+        async function loadPendingLeave() {
+            const container = document.getElementById('leaveReviewContainer');
+            container.innerHTML = '<div class="loading"><div class="spinner"></div>載入中...</div>';
+            
+            try {
+                const res = await fetch(API_URL + '?action=getPendingLeaveReview');
+                const data = await res.json();
+                
+                if (data.success) {
+                    pendingLeaves = data.records || [];
+                    renderLeaveReview();
+                } else {
+                    container.innerHTML = '<p style="color:#666;padding:20px;">載入失敗</p>';
+                }
+            } catch (e) {
+                console.error('載入請假審核失敗', e);
+                container.innerHTML = '<p style="color:#666;padding:20px;">載入失敗：' + e.message + '</p>';
+            }
+        }
+        
+        function renderLeaveReview() {
+            const container = document.getElementById('leaveReviewContainer');
+            
+            if (pendingLeaves.length === 0) {
+                container.innerHTML = '<p style="color:#666;padding:20px;text-align:center;">🎉 目前沒有待審核的請假</p>';
+                return;
+            }
+            
+            let html = `<div style="margin-bottom:10px;font-size:13px;color:#666;">共 <strong>${pendingLeaves.length}</strong> 筆待審核</div>`;
+            
+            pendingLeaves.forEach((record, index) => {
+                const shiftDisplay = record.shiftName || '無排班';
+                const submitTimeDisplay = formatDateTimeDisplay(record.submitTime);
+                const reasonDisplay = record.reason ? `<div style="margin-bottom:8px;font-size:13px;background:#f3f4f6;padding:8px 10px;border-radius:6px;"><span style="color:#666;">請假原因：</span>${record.reason}</div>` : '';
+                
+                // 假別顏色
+                let leaveColor = '#9ca3af';
+                switch (record.leaveType) {
+                    case '特休': leaveColor = '#10b981'; break;
+                    case '病假': leaveColor = '#f59e0b'; break;
+                    case '事假': leaveColor = '#ef4444'; break;
+                    case '補休': leaveColor = '#3b82f6'; break;
+                    case '婚假': leaveColor = '#ec4899'; break;
+                    case '喪假': leaveColor = '#6b7280'; break;
+                    case '產假': leaveColor = '#8b5cf6'; break;
+                    case '陪產假': leaveColor = '#8b5cf6'; break;
+                    case '公假': leaveColor = '#06b6d4'; break;
+                }
+                
+                html += `<div class="leave-review-item" style="background:#f9fafb;border-radius:10px;padding:15px;margin-bottom:12px;border-left:4px solid ${leaveColor};">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">
+                        <div>
+                            <strong style="font-size:15px;display:block;">${record.staffName}</strong>
+                            <span style="font-size:12px;color:#666;">請假日期：${formatDateDisplay(record.date)}</span>
+                        </div>
+                        <span style="background:#fef3c7;color:#92400e;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600;">待審核</span>
+                    </div>
+                    <div style="margin-bottom:8px;font-size:13px;color:#666;">
+                        原班別：<span style="color:#333;font-weight:500;">${shiftDisplay}</span>
+                    </div>
+                    <div style="display:flex;gap:20px;margin-bottom:12px;font-size:14px;">
+                        <div>
+                            <span style="color:#666;">假別：</span>
+                            <strong style="color:${leaveColor};">${record.leaveType}</strong>
+                        </div>
+                        <div>
+                            <span style="color:#666;">時數：</span>
+                            <strong style="color:#ef4444;">${record.hours} 小時</strong>
+                        </div>
+                    </div>
+                    ${reasonDisplay}
+                    <div style="font-size:11px;color:#999;margin-bottom:10px;">提交時間：${submitTimeDisplay}</div>
+                    <div style="display:flex;gap:10px;">
+                        <button class="btn" style="flex:1;background:#10b981;color:white;padding:8px;" onclick="approveLeave(${record.rowIndex})">✓ 通過</button>
+                        <button class="btn" style="flex:1;background:#ef4444;color:white;padding:8px;" onclick="rejectLeave(${record.rowIndex})">✗ 拒絕</button>
+                    </div>
+                </div>`;
+            });
+            
+            container.innerHTML = html;
+        }
+        
+        async function approveLeave(rowIndex) {
+            if (!confirm('確定通過此請假申請？')) return;
+            
+            try {
+                const payload = { rowIndex, approved: true };
+                const res = await fetch(API_URL + '?action=reviewLeave&data=' + encodeURIComponent(JSON.stringify(payload)));
+                const data = await res.json();
+                
+                if (data.success) {
+                    showToast('✅ 已審核通過');
+                    loadPendingLeave();
+                } else {
+                    showToast('❌ 審核失敗：' + (data.error || ''));
+                }
+            } catch (e) {
+                showToast('❌ 審核失敗');
+            }
+        }
+        
+        async function rejectLeave(rowIndex) {
+            if (!confirm('確定拒絕此請假申請？')) return;
+            
+            try {
+                const payload = { rowIndex, approved: false };
+                const res = await fetch(API_URL + '?action=reviewLeave&data=' + encodeURIComponent(JSON.stringify(payload)));
+                const data = await res.json();
+                
+                if (data.success) {
+                    showToast('✅ 已拒絕');
+                    loadPendingLeave();
                 } else {
                     showToast('❌ 操作失敗');
                 }
