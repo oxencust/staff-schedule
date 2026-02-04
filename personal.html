@@ -623,6 +623,10 @@
                         <select id="overtimeFillEnd" style="padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; width: 100px;"></select>
                     </div>
                 </div>
+                <div style="margin-bottom: 10px;">
+                    <label style="font-size: 13px; color: #666; display: block; margin-bottom: 8px;">備註</label>
+                    <input type="text" id="overtimeFillNote" placeholder="選填，可填加班原因" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; box-sizing: border-box;">
+                </div>
             </div>
             <div class="modal-buttons">
                 <button class="modal-btn modal-btn-cancel" onclick="closeOvertimeFillModal()">取消</button>
@@ -654,7 +658,7 @@
 
     <script>
         // ============ 設定區 ============
-        const API_URL = 'https://script.google.com/macros/s/AKfycbz6PFNg028FY5mO5F6YA-4XoqDZBns6tiJlBVJ199gcKo-sSvbVvjPmsVyjBIdQG36x/exec';
+        const API_URL = 'https://script.google.com/macros/s/AKfycbxbu3zEREOqG-5dA0New59ne64DZQcEgs5tDBcET_dN4xCIz_PBkaOXvUlscrF5zz7c/exec';
         
         let currentYear = new Date().getFullYear();
         let currentMonth = new Date().getMonth();
@@ -842,12 +846,14 @@
         
         function closeOvertimeFillModal() {
             document.getElementById('overtimeFillModal').classList.remove('show');
+            document.getElementById('overtimeFillNote').value = '';
             currentOvertimeDate = null;
         }
         
         async function submitSingleOvertime() {
             const startTime = document.getElementById('overtimeFillStart').value;
             const endTime = document.getElementById('overtimeFillEnd').value;
+            const note = document.getElementById('overtimeFillNote').value.trim();
             
             if (!startTime || !endTime) {
                 showToast('請選擇加班時間');
@@ -876,7 +882,8 @@
                         date: currentOvertimeDate,
                         shiftName: shiftName,
                         startTime: startTime,
-                        endTime: endTime
+                        endTime: endTime,
+                        note: note
                     }]
                 };
                 
