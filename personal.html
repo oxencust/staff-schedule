@@ -512,6 +512,12 @@
             </div>
 
             <div class="submit-section">
+                <!-- 回填加班按鈕（1-5號顯示） -->
+                <div id="overtimeEntryBtn" style="display: none; margin-bottom: 10px;">
+                    <button class="btn" onclick="enterOvertimeMode()" style="width: 100%; background: linear-gradient(135deg, #f59e0b, #d97706); color: white; padding: 12px; font-weight: 600;">
+                        📋 回填上月加班時間
+                    </button>
+                </div>
                 <div style="display: flex; gap: 10px;">
                     <button class="btn btn-secondary" onclick="clearAll()" style="flex: 1;">🗑️ 清除</button>
                     <button class="btn btn-primary btn-submit" onclick="showConfirmModal()" style="flex: 2;">✅ 送出</button>
@@ -701,10 +707,13 @@
             const today = new Date();
             const dayOfMonth = today.getDate();
             
-            // 只在 1-5 號顯示提醒
+            // 只在 1-5 號顯示回填功能
             if (dayOfMonth > 5) return;
             
-            // 檢查是否已經確認過（本次 session）
+            // 顯示回填按鈕（隨時可以點）
+            document.getElementById('overtimeEntryBtn').style.display = 'block';
+            
+            // 檢查是否已經確認過（本次 session），沒確認過才彈提醒
             const confirmed = sessionStorage.getItem('overtimeReminderConfirmed');
             if (confirmed) return;
             
@@ -739,8 +748,9 @@
             // 載入上月排班資料
             await loadLastMonthSchedules();
             
-            // 顯示回填模式提示條
+            // 顯示回填模式提示條，隱藏回填按鈕
             document.getElementById('overtimeModeBar').style.display = 'block';
+            document.getElementById('overtimeEntryBtn').style.display = 'none';
             document.getElementById('staffNameDisplay').innerHTML = 
                 `<span class="staff-name">${staffName}</span> 點選日期回填<strong style="color:#f59e0b;">加班時間</strong>`;
             
@@ -758,8 +768,9 @@
             currentYear = today.getFullYear();
             currentMonth = today.getMonth();
             
-            // 隱藏回填模式提示條
+            // 隱藏回填模式提示條，顯示回填按鈕
             document.getElementById('overtimeModeBar').style.display = 'none';
+            document.getElementById('overtimeEntryBtn').style.display = 'block';
             document.getElementById('staffNameDisplay').innerHTML = 
                 `<span class="staff-name">${staffName}</span> 請點選<strong>可以上班</strong>的日期`;
             
