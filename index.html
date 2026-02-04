@@ -534,7 +534,7 @@
 
     <script>
         // ============ 設定區（請在這裡修改）============
-        const API_URL = 'https://script.google.com/macros/s/AKfycbwp5Qs7neS0TBgsxQeGjGTa65M4crnMVP0kDCO5wXrJxIYcx-qSKsf9UkQ5vj_W6wsD_w/exec';
+        const API_URL = 'https://script.google.com/macros/s/AKfycbxhz9iG9dNvL374FXAWcCsyMd9qpgMd7hqx13Vw2x4fp9pWpK0AoOox6h2FPlyHOaCwJw/exec';
         
         let staffList = [];
         let shifts = [];
@@ -1571,6 +1571,7 @@
             
             try {
                 const payload = {
+                    action: 'exportSchedule',
                     y: currentYear,
                     m: currentMonth + 1,
                     d: d,
@@ -1578,16 +1579,12 @@
                     s: sortedStaffNames  // 員工名單（已排序）
                 };
                 
-                const jsonStr = JSON.stringify(payload);
-                console.log('匯出資料大小:', jsonStr.length, '字元');
-                
-                if (jsonStr.length > 7500) {
-                    showToast('⚠️ 資料量太大（' + jsonStr.length + '字元），請減少排班');
-                    return;
-                }
-                
-                const encodedData = encodeURIComponent(jsonStr);
-                const res = await fetch(API_URL + '?action=exportSchedule&data=' + encodedData);
+                // 使用 POST 避免 URL 長度限制
+                const res = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: JSON.stringify(payload)
+                });
                 const data = await res.json();
                 showToast(data.success ? '✅ ' + data.message : '❌ 匯出失敗：' + (data.error || ''));
             } catch (e) { 
@@ -1931,11 +1928,17 @@
             try {
                 const monthStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
                 const payload = {
+                    action: 'saveSchedules',
                     month: monthStr,
                     schedules: schedule
                 };
                 
-                const res = await fetch(API_URL + '?action=saveSchedules&data=' + encodeURIComponent(JSON.stringify(payload)));
+                // 使用 POST 避免 URL 長度限制
+                const res = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: JSON.stringify(payload)
+                });
                 const data = await res.json();
                 
                 if (data.success) {
