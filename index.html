@@ -516,7 +516,7 @@
 
     <script>
         // ============ 設定區（請在這裡修改）============
-        const API_URL = 'https://script.google.com/macros/s/AKfycbz6PFNg028FY5mO5F6YA-4XoqDZBns6tiJlBVJ199gcKo-sSvbVvjPmsVyjBIdQG36x/exec';
+        const API_URL = 'https://script.google.com/macros/s/AKfycbxbu3zEREOqG-5dA0New59ne64DZQcEgs5tDBcET_dN4xCIz_PBkaOXvUlscrF5zz7c/exec';
         
         let staffList = [];
         let shifts = [];
@@ -1622,13 +1622,19 @@
             let html = `<div style="margin-bottom:10px;font-size:13px;color:#666;">共 <strong>${pendingOvertimes.length}</strong> 筆待審核</div>`;
             
             pendingOvertimes.forEach((record, index) => {
-                const hours = calculateOvertimeHours(record.startTime, record.endTime);
+                // 格式化時間（處理 ISO 格式或 HH:MM 格式）
+                const startTimeDisplay = formatTimeDisplay(record.startTime);
+                const endTimeDisplay = formatTimeDisplay(record.endTime);
+                const hours = calculateOvertimeHoursFromDisplay(startTimeDisplay, endTimeDisplay);
                 const shiftDisplay = record.shiftName || '臨時上班';
+                const submitTimeDisplay = formatDateTimeDisplay(record.submitTime);
+                const noteDisplay = record.note ? `<div style="margin-bottom:8px;font-size:13px;background:#f3f4f6;padding:8px 10px;border-radius:6px;"><span style="color:#666;">備註：</span>${record.note}</div>` : '';
+                
                 html += `<div class="overtime-review-item" style="background:#f9fafb;border-radius:10px;padding:15px;margin-bottom:12px;border-left:4px solid #f59e0b;">
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
                         <div>
                             <strong style="font-size:15px;">${record.staffName}</strong>
-                            <span style="font-size:12px;color:#666;margin-left:8px;">${record.date}</span>
+                            <span style="font-size:12px;color:#666;margin-left:8px;">${formatDateDisplay(record.date)}</span>
                         </div>
                         <span style="background:#fef3c7;color:#92400e;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600;">待審核</span>
                     </div>
@@ -1638,14 +1644,15 @@
                     <div style="display:flex;gap:20px;margin-bottom:12px;font-size:14px;">
                         <div>
                             <span style="color:#666;">加班時間：</span>
-                            <strong>${record.startTime || '-'} ~ ${record.endTime || '-'}</strong>
+                            <strong>${startTimeDisplay} ~ ${endTimeDisplay}</strong>
                         </div>
                         <div>
                             <span style="color:#666;">時數：</span>
                             <strong style="color:#10b981;">${hours} 小時</strong>
                         </div>
                     </div>
-                    <div style="font-size:11px;color:#999;margin-bottom:10px;">提交時間：${record.submitTime}</div>
+                    ${noteDisplay}
+                    <div style="font-size:11px;color:#999;margin-bottom:10px;">提交時間：${submitTimeDisplay}</div>
                     <div style="display:flex;gap:10px;">
                         <button class="btn" style="flex:1;background:#10b981;color:white;padding:8px;" onclick="approveOvertime(${record.rowIndex})">✓ 通過</button>
                         <button class="btn" style="flex:1;background:#ef4444;color:white;padding:8px;" onclick="rejectOvertime(${record.rowIndex})">✗ 拒絕</button>
@@ -1656,10 +1663,59 @@
             container.innerHTML = html;
         }
         
+        // 格式化時間顯示（處理 ISO 或 HH:MM 格式）
+        function formatTimeDisplay(timeStr) {
+            if (!timeStr) return '-';
+            // 如果是 ISO 格式（含 T）
+            if (timeStr.includes('T')) {
+                const date = new Date(timeStr);
+                const hours = String(date.getHours()).padStart(2, '0');
+                const minutes = String(date.getMinutes()).padStart(2, '0');
+                return `${hours}:${minutes}`;
+            }
+            // 已經是 HH:MM 格式
+            return timeStr;
+        }
+        
+        // 格式化日期顯示（處理 ISO 或 YYYY-MM-DD 格式）
+        function formatDateDisplay(dateStr) {
+            if (!dateStr) return '-';
+            if (dateStr.includes('T')) {
+                const date = new Date(dateStr);
+                return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+            }
+            return dateStr;
+        }
+        
+        // 格式化日期時間顯示
+        function formatDateTimeDisplay(dateTimeStr) {
+            if (!dateTimeStr) return '-';
+            if (dateTimeStr.includes('T')) {
+                const date = new Date(dateTimeStr);
+                return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')} ${String(date.getHours()).padStart(2,'0')}:${String(date.getMinutes()).padStart(2,'0')}`;
+            }
+            return dateTimeStr;
+        }
+        
+        // 從顯示格式計算加班時數
+        function calculateOvertimeHoursFromDisplay(startDisplay, endDisplay) {
+            if (startDisplay === '-' || endDisplay === '-') return 0;
+            const [startH, startM] = startDisplay.split(':').map(Number);
+            const [endH, endM] = endDisplay.split(':').map(Number);
+            if (isNaN(startH) || isNaN(endH)) return 0;
+            let minutes = (endH * 60 + endM) - (startH * 60 + startM);
+            if (minutes < 0) minutes += 24 * 60;
+            return (minutes / 60).toFixed(1);
+        }
+        
         function calculateOvertimeHours(start, end) {
             if (!start || !end) return 0;
+            // 處理 ISO 格式
+            if (start.includes('T')) start = formatTimeDisplay(start);
+            if (end.includes('T')) end = formatTimeDisplay(end);
             const [startH, startM] = start.split(':').map(Number);
             const [endH, endM] = end.split(':').map(Number);
+            if (isNaN(startH) || isNaN(endH)) return 0;
             let minutes = (endH * 60 + endM) - (startH * 60 + startM);
             if (minutes < 0) minutes += 24 * 60;
             return (minutes / 60).toFixed(1);
