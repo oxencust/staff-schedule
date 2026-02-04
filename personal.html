@@ -511,9 +511,18 @@
                     </button>
                 </div>
                 <!-- 正常模式按鈕 -->
-                <div id="normalModeButtons" style="display: flex; gap: 10px;">
-                    <button class="btn btn-secondary" onclick="clearAll()" style="flex: 1;">🗑️ 清除</button>
-                    <button class="btn btn-primary btn-submit" onclick="showConfirmModal()" style="flex: 2;">✅ 送出</button>
+                <div id="normalModeButtons" style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <button class="btn btn-secondary" onclick="clearAll()" style="flex: 1; min-width: 80px;">🗑️ 清除</button>
+                    <button class="btn btn-secondary" onclick="showLeaveModal()" style="flex: 1; min-width: 100px; background: #f3f4f6; color: #6b7280;">📝 請假</button>
+                    <button class="btn btn-primary btn-submit" onclick="showConfirmModal()" style="flex: 2; min-width: 120px;">✅ 送出</button>
+                </div>
+            </div>
+
+            <!-- 請假記錄區塊 -->
+            <div class="info-card" style="margin-top: 15px;" id="leaveRecordsCard">
+                <h3>📝 我的請假記錄</h3>
+                <div id="leaveRecordsContainer" style="margin-top: 10px;">
+                    <p style="color: #999; font-size: 13px;">載入中...</p>
                 </div>
             </div>
 
@@ -572,6 +581,54 @@
             <div class="modal-buttons">
                 <button class="modal-btn modal-btn-cancel" onclick="closeConfirmModal()">取消</button>
                 <button class="modal-btn modal-btn-confirm" onclick="confirmSubmit()">確認送出</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 請假申請 Modal -->
+    <div class="modal-overlay" id="leaveModal">
+        <div class="modal" style="max-width: 380px;">
+            <div class="modal-header" style="background: linear-gradient(135deg, #9ca3af, #6b7280); color: white;">
+                📝 請假申請
+            </div>
+            <div class="modal-content" style="padding: 15px;">
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; font-size: 13px; color: #666; margin-bottom: 5px;">請假日期</label>
+                    <input type="date" id="leaveDateInput" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px;">
+                </div>
+                <div id="leaveOriginalShift" style="font-size: 13px; color: #666; margin-bottom: 15px; padding: 10px; background: #f3f4f6; border-radius: 8px; display: none;">
+                    原班別：<span id="leaveShiftName">-</span>
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; font-size: 13px; color: #666; margin-bottom: 5px;">假別</label>
+                    <select id="leaveTypeSelect" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px;">
+                        <option value="特休">🌴 特休</option>
+                        <option value="病假">🏥 病假</option>
+                        <option value="事假">📝 事假</option>
+                        <option value="補休">🔄 補休</option>
+                        <option value="婚假">💒 婚假</option>
+                        <option value="喪假">🕯️ 喪假</option>
+                        <option value="產假">👶 產假</option>
+                        <option value="陪產假">👨‍👶 陪產假</option>
+                        <option value="公假">🏛️ 公假</option>
+                    </select>
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; font-size: 13px; color: #666; margin-bottom: 5px;">請假時數</label>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <input type="number" id="leaveHoursInput" value="8" min="0.5" max="8" step="0.5" style="flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px;">
+                        <span style="color: #666;">小時</span>
+                    </div>
+                    <div style="font-size: 11px; color: #999; margin-top: 5px;">整天請假填 8，半天填 4</div>
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; font-size: 13px; color: #666; margin-bottom: 5px;">請假原因（選填）</label>
+                    <textarea id="leaveReasonInput" rows="2" placeholder="例如：家中有事" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; resize: none;"></textarea>
+                </div>
+            </div>
+            <div class="modal-buttons">
+                <button class="modal-btn modal-btn-cancel" onclick="closeLeaveModal()">取消</button>
+                <button class="modal-btn modal-btn-confirm" onclick="submitLeaveRequest()">送出申請</button>
             </div>
         </div>
     </div>
@@ -651,7 +708,7 @@
 
     <script>
         // ============ 設定區 ============
-        const API_URL = 'https://script.google.com/macros/s/AKfycbz072OarRtqw0yhcxrfMEdIr_PcnUlgt3JpzTa9YfJHboH43ZSgcjuv1594tiStYHrPJA/exec';
+        const API_URL = 'https://script.google.com/macros/s/AKfycbwp5Qs7neS0TBgsxQeGjGTa65M4crnMVP0kDCO5wXrJxIYcx-qSKsf9UkQ5vj_W6wsD_w/exec';
         
         let currentYear = new Date().getFullYear();
         let currentMonth = new Date().getMonth();
@@ -695,9 +752,194 @@
             // 檢查是否需要回填加班（1-4號期間）
             if (staffName) {
                 checkOvertimeReminder();
+                loadMyLeaveRecords();  // 載入請假記錄
             }
         };
         
+        // ============ 請假功能 ============
+        let myLeaveRecords = [];
+        let myLeaveQuota = null;
+        
+        async function loadMyLeaveRecords() {
+            if (!API_URL || !staffName) return;
+            
+            try {
+                const year = new Date().getFullYear();
+                const res = await fetch(API_URL + '?action=getMyLeaveRecords&staff=' + encodeURIComponent(staffName) + '&year=' + year);
+                const data = await res.json();
+                
+                if (data.success) {
+                    myLeaveRecords = data.records || [];
+                    renderLeaveRecords();
+                }
+            } catch (e) {
+                console.error('載入請假記錄失敗', e);
+            }
+        }
+        
+        function renderLeaveRecords() {
+            const container = document.getElementById('leaveRecordsContainer');
+            
+            if (myLeaveRecords.length === 0) {
+                container.innerHTML = '<p style="color: #999; font-size: 13px; text-align: center;">目前沒有請假記錄</p>';
+                return;
+            }
+            
+            let html = '';
+            myLeaveRecords.forEach(record => {
+                let statusColor = '#f59e0b';
+                let statusText = record.status;
+                if (record.status === '已通過') {
+                    statusColor = '#10b981';
+                } else if (record.status === '已拒絕') {
+                    statusColor = '#ef4444';
+                }
+                
+                // 假別 icon
+                let leaveIcon = '📝';
+                switch (record.leaveType) {
+                    case '特休': leaveIcon = '🌴'; break;
+                    case '病假': leaveIcon = '🏥'; break;
+                    case '事假': leaveIcon = '📝'; break;
+                    case '補休': leaveIcon = '🔄'; break;
+                    case '婚假': leaveIcon = '💒'; break;
+                    case '喪假': leaveIcon = '🕯️'; break;
+                    case '產假': leaveIcon = '👶'; break;
+                    case '陪產假': leaveIcon = '👨‍👶'; break;
+                    case '公假': leaveIcon = '🏛️'; break;
+                }
+                
+                html += `<div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: #f9fafb; border-radius: 8px; margin-bottom: 8px;">
+                    <div>
+                        <div style="font-weight: 600; font-size: 14px;">${record.date}</div>
+                        <div style="font-size: 12px; color: #666; margin-top: 2px;">${leaveIcon} ${record.leaveType} ${record.hours}小時</div>
+                        ${record.shiftName ? `<div style="font-size: 11px; color: #999; margin-top: 2px;">原班別：${record.shiftName}</div>` : ''}
+                    </div>
+                    <span style="background: ${statusColor}; color: white; padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 600;">${statusText}</span>
+                </div>`;
+            });
+            
+            container.innerHTML = html;
+        }
+        
+        function showLeaveModal() {
+            // 設定預設日期為今天
+            const today = new Date();
+            const dateStr = formatDate(today);
+            document.getElementById('leaveDateInput').value = dateStr;
+            document.getElementById('leaveHoursInput').value = '8';
+            document.getElementById('leaveReasonInput').value = '';
+            document.getElementById('leaveOriginalShift').style.display = 'none';
+            
+            // 檢查該日期是否有排班
+            checkLeaveDate(dateStr);
+            
+            document.getElementById('leaveModal').classList.add('show');
+        }
+        
+        function closeLeaveModal() {
+            document.getElementById('leaveModal').classList.remove('show');
+        }
+        
+        // 監聽日期變化，顯示原班別
+        document.addEventListener('DOMContentLoaded', function() {
+            const dateInput = document.getElementById('leaveDateInput');
+            if (dateInput) {
+                dateInput.addEventListener('change', function() {
+                    checkLeaveDate(this.value);
+                });
+            }
+        });
+        
+        async function checkLeaveDate(dateStr) {
+            const shiftContainer = document.getElementById('leaveOriginalShift');
+            const shiftNameSpan = document.getElementById('leaveShiftName');
+            
+            // 從排班資料中查找該日期的班別
+            // 這裡需要呼叫 API 取得排班資料
+            if (!API_URL || !staffName) {
+                shiftContainer.style.display = 'none';
+                return;
+            }
+            
+            try {
+                const month = dateStr.substring(0, 7);
+                const res = await fetch(API_URL + '?action=getSchedules&month=' + month);
+                const data = await res.json();
+                
+                if (data.success && data.schedules) {
+                    const daySchedule = data.schedules[dateStr] || [];
+                    const mySchedule = daySchedule.find(s => s.staffName === staffName);
+                    
+                    if (mySchedule && mySchedule.shiftId) {
+                        // 取得班別名稱
+                        const shiftsRes = await fetch(API_URL + '?action=getShifts');
+                        const shiftsData = await shiftsRes.json();
+                        const shift = (shiftsData.shifts || []).find(s => s.id === mySchedule.shiftId);
+                        
+                        if (shift) {
+                            shiftNameSpan.textContent = shift.name + (shift.time ? ` (${shift.time})` : '');
+                            shiftContainer.style.display = 'block';
+                            return;
+                        }
+                    }
+                }
+                
+                shiftNameSpan.textContent = '無排班';
+                shiftContainer.style.display = 'block';
+            } catch (e) {
+                console.error('檢查排班失敗', e);
+                shiftContainer.style.display = 'none';
+            }
+        }
+        
+        async function submitLeaveRequest() {
+            const dateStr = document.getElementById('leaveDateInput').value;
+            const leaveType = document.getElementById('leaveTypeSelect').value;
+            const hours = parseFloat(document.getElementById('leaveHoursInput').value) || 8;
+            const reason = document.getElementById('leaveReasonInput').value.trim();
+            const shiftName = document.getElementById('leaveShiftName').textContent || '';
+            
+            if (!dateStr) {
+                showToast('請選擇請假日期');
+                return;
+            }
+            
+            if (hours <= 0 || hours > 8) {
+                showToast('請假時數必須在 0.5~8 小時之間');
+                return;
+            }
+            
+            try {
+                showToast('📤 送出中...');
+                
+                const payload = {
+                    staff: staffName,
+                    submissions: [{
+                        date: dateStr,
+                        shiftName: shiftName !== '無排班' ? shiftName : '',
+                        leaveType: leaveType,
+                        hours: hours,
+                        reason: reason
+                    }]
+                };
+                
+                const res = await fetch(API_URL + '?action=submitLeave&data=' + encodeURIComponent(JSON.stringify(payload)));
+                const data = await res.json();
+                
+                if (data.success) {
+                    showToast('✅ 請假申請已送出！');
+                    closeLeaveModal();
+                    loadMyLeaveRecords();
+                } else {
+                    showToast('❌ 送出失敗：' + (data.error || ''));
+                }
+            } catch (e) {
+                console.error('送出請假申請失敗', e);
+                showToast('❌ 送出失敗，請檢查網路');
+            }
+        }
+
         // ============ 加班回填功能 ============
         
         async function checkOvertimeReminder() {
