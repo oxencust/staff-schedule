@@ -64,9 +64,6 @@
             padding: 16px 20px; 
             color: white; 
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            position: sticky;
-            top: 0;
-            z-index: 100;
         }
         .navbar h1 { font-size: 18px; margin-bottom: 6px; }
         .navbar p { font-size: 14px; opacity: 0.95; line-height: 1.6; }
@@ -333,8 +330,6 @@
         }
 
         @media (max-width: 767px) {
-            body { padding-bottom: 80px; }
-            
             .navbar { padding: 12px 15px; }
             .navbar h1 { font-size: 17px; }
             
@@ -372,17 +367,11 @@
             .shift-badges { gap: 2px; margin-top: 2px; }
             .shift-badge { font-size: 8px; padding: 1px 4px; }
             
-            /* 底部固定按鈕 */
+            /* 底部按鈕 */
             .submit-section {
-                position: fixed;
-                bottom: 0;
-                left: 0;
-                right: 0;
                 background: white;
                 padding: 12px 15px;
-                box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
-                z-index: 100;
-                border-radius: 16px 16px 0 0;
+                margin-top: 15px;
             }
             .btn-submit { 
                 padding: 14px 20px; 
@@ -468,9 +457,6 @@
             <div id="overtimeModeBar" style="display: none; background: linear-gradient(135deg, #f59e0b, #d97706); color: white; padding: 12px 15px; border-radius: 10px; margin-bottom: 15px; text-align: center;">
                 <div style="font-weight: 600; margin-bottom: 5px;">📋 加班回填模式</div>
                 <div style="font-size: 12px; opacity: 0.9;">點選日曆上的日期回填加班時間</div>
-                <button onclick="exitOvertimeMode()" style="margin-top: 10px; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.5); color: white; padding: 6px 15px; border-radius: 20px; font-size: 12px; cursor: pointer;">
-                    ✓ 完成回填，返回排班
-                </button>
             </div>
             
             <div class="control-panel">
@@ -512,13 +498,20 @@
             </div>
 
             <div class="submit-section">
-                <!-- 回填加班按鈕（1-5號顯示） -->
+                <!-- 回填加班按鈕（1-5號顯示，非回填模式時） -->
                 <div id="overtimeEntryBtn" style="display: none; margin-bottom: 10px;">
                     <button class="btn" onclick="enterOvertimeMode()" style="width: 100%; background: linear-gradient(135deg, #f59e0b, #d97706); color: white; padding: 12px; font-weight: 600;">
                         📋 回填上月加班時間
                     </button>
                 </div>
-                <div style="display: flex; gap: 10px;">
+                <!-- 完成回填按鈕（回填模式時顯示） -->
+                <div id="overtimeExitBtn" style="display: none;">
+                    <button class="btn" onclick="exitOvertimeMode()" style="width: 100%; background: linear-gradient(135deg, #10b981, #059669); color: white; padding: 12px; font-weight: 600;">
+                        ✓ 完成回填，返回排班
+                    </button>
+                </div>
+                <!-- 正常模式按鈕 -->
+                <div id="normalModeButtons" style="display: flex; gap: 10px;">
                     <button class="btn btn-secondary" onclick="clearAll()" style="flex: 1;">🗑️ 清除</button>
                     <button class="btn btn-primary btn-submit" onclick="showConfirmModal()" style="flex: 2;">✅ 送出</button>
                 </div>
@@ -752,9 +745,11 @@
             // 載入上月排班資料
             await loadLastMonthSchedules();
             
-            // 顯示回填模式提示條，隱藏回填按鈕
+            // 顯示回填模式提示條和返回按鈕，隱藏正常模式按鈕
             document.getElementById('overtimeModeBar').style.display = 'block';
             document.getElementById('overtimeEntryBtn').style.display = 'none';
+            document.getElementById('overtimeExitBtn').style.display = 'block';
+            document.getElementById('normalModeButtons').style.display = 'none';
             document.getElementById('staffNameDisplay').innerHTML = 
                 `<span class="staff-name">${staffName}</span> 點選日期回填<strong style="color:#f59e0b;">加班時間</strong>`;
             
@@ -772,9 +767,11 @@
             currentYear = today.getFullYear();
             currentMonth = today.getMonth();
             
-            // 隱藏回填模式提示條，顯示回填按鈕
+            // 隱藏回填模式提示條和返回按鈕，顯示正常模式按鈕
             document.getElementById('overtimeModeBar').style.display = 'none';
+            document.getElementById('overtimeExitBtn').style.display = 'none';
             document.getElementById('overtimeEntryBtn').style.display = 'block';
+            document.getElementById('normalModeButtons').style.display = 'flex';
             document.getElementById('staffNameDisplay').innerHTML = 
                 `<span class="staff-name">${staffName}</span> 請點選<strong>可以上班</strong>的日期`;
             
@@ -1334,16 +1331,22 @@
             document.getElementById('unmarkedCount').textContent = workDays - availableCount;
         }
 
-        function previousMonth() {
+        async function previousMonth() {
+            showToast('⏳ 載入中...');
             currentMonth--;
-            if (currentMonth < 0) { currentMonth = 11; currentYear--; fetchHolidays(currentYear).then(h => { holidays = h; generateCalendar(); updateStats(); }); }
-            else { generateCalendar(); updateStats(); }
+            if (currentMonth < 0) { currentMonth = 11; currentYear--; holidays = await fetchHolidays(currentYear); }
+            if (isOvertimeMode) { await loadLastMonthSchedules(); }
+            generateCalendar(); 
+            updateStats();
         }
 
-        function nextMonth() {
+        async function nextMonth() {
+            showToast('⏳ 載入中...');
             currentMonth++;
-            if (currentMonth > 11) { currentMonth = 0; currentYear++; fetchHolidays(currentYear).then(h => { holidays = h; generateCalendar(); updateStats(); }); }
-            else { generateCalendar(); updateStats(); }
+            if (currentMonth > 11) { currentMonth = 0; currentYear++; holidays = await fetchHolidays(currentYear); }
+            if (isOvertimeMode) { await loadLastMonthSchedules(); }
+            generateCalendar(); 
+            updateStats();
         }
 
         function saveLocalData() { localStorage.setItem(`available_${staffName}`, JSON.stringify(availableDates)); }
