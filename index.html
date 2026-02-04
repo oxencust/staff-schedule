@@ -516,7 +516,7 @@
 
     <script>
         // ============ 設定區（請在這裡修改）============
-        const API_URL = 'https://script.google.com/macros/s/AKfycbyIZKSNnJvDuJEPkj6Evww1H04ZS9XhStSOQWjhPIiT_MonBbx4sYVa6PjYmKxa1XhA/exec';
+        const API_URL = 'https://script.google.com/macros/s/AKfycbzDUVCo82Kai08MHbZDRZwBvdvJgPwMMCqNalJdwIqqPYHanAnoa0g5vVYZ1li9bl8r/exec';
         
         let staffList = [];
         let shifts = [];
@@ -1778,11 +1778,20 @@
                 const data = await res.json();
                 
                 if (data.success) {
-                    showToast('✅ 已儲存到 Google Sheet');
+                    // 顯示更詳細的訊息
+                    let msg = '✅ 已儲存';
+                    if (data.webhookSent) {
+                        msg += '，已同步 Webhook';
+                    } else if (data.webhookError) {
+                        msg += '（' + data.webhookError + '）';
+                    }
+                    showToast(msg);
+                    console.log('儲存結果:', data);
                 } else {
                     showToast('❌ 儲存失敗：' + (data.error || ''));
                 }
             } catch (e) {
+                console.error('儲存錯誤:', e);
                 showToast('❌ 儲存失敗');
             }
         }
