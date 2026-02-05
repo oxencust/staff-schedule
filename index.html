@@ -1565,7 +1565,7 @@
                             <span class="staff-status ${isAvailable ? 'available' : 'unavailable'}">${isAvailable ? '✓可' : '✗'}</span>
                         </div>
                         <div class="shift-buttons">
-                            <button class="shift-toggle-btn no-schedule ${!staffSched ? 'selected' : ''}" 
+                            <button class="shift-toggle-btn no-schedule ${!staffSched && !shouldShowCustom ? 'selected' : ''}" 
                                 data-shift-id="" data-staff="${staff.name}" data-is-leave="false"
                                 onclick="toggleShiftBtn(this, '#9ca3af')">不排</button>`;
                     
