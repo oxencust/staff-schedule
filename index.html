@@ -534,7 +534,7 @@
 
     <script>
         // ============ 設定區（請在這裡修改）============
-        const API_URL = 'https://script.google.com/macros/s/AKfycbxrkcIhMnaR0yhE0x1C06-y1_ed3l2nwh0GJeJyO4k2xbs2p-KdpHIbrSvUmW8CYmTSyQ/exec';
+        const API_URL = 'https://script.google.com/macros/s/AKfycbyOSnqSRqGJG_8_4XxlvtOhhzjUBd2b7onysKfsYpD8cGDYf9tlXuupABcNmMM-9KIswA/exec';
         
         let staffList = [];
         let shifts = [];
@@ -1927,63 +1927,31 @@
             
             try {
                 const monthStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
+                const payload = {
+                    action: 'saveSchedules',
+                    month: monthStr,
+                    schedules: schedule
+                };
                 
-                // 將排班資料按日期分批（每批最多 10 天）
-                const dates = Object.keys(schedule).filter(d => d.startsWith(monthStr)).sort();
-                const batchSize = 10;
-                const batches = [];
+                // 使用 POST 一次送完整月資料
+                const res = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
                 
-                for (let i = 0; i < dates.length; i += batchSize) {
-                    const batchDates = dates.slice(i, i + batchSize);
-                    const batchSchedules = {};
-                    batchDates.forEach(d => {
-                        batchSchedules[d] = schedule[d];
-                    });
-                    batches.push(batchSchedules);
-                }
-                
-                // 如果沒有資料，送一個空的
-                if (batches.length === 0) {
-                    batches.push({});
-                }
-                
-                // 逐批發送
-                let success = true;
-                for (let i = 0; i < batches.length; i++) {
-                    const payload = {
-                        month: monthStr,
-                        schedules: batches[i],
-                        batchIndex: i,
-                        totalBatches: batches.length,
-                        isFirstBatch: i === 0,
-                        isLastBatch: i === batches.length - 1
-                    };
-                    
-                    const url = API_URL + '?action=saveSchedules&data=' + encodeURIComponent(JSON.stringify(payload));
-                    
-                    // 檢查 URL 長度
-                    if (url.length > 8000) {
-                        showToast('❌ 單批資料太大，請減少每日排班人數');
-                        return;
+                if (data.success) {
+                    let msg = '✅ 已儲存';
+                    if (data.webhookSent) {
+                        msg += '，已同步';
+                    } else if (data.webhookError) {
+                        msg += '（' + data.webhookError + '）';
                     }
-                    
-                    const res = await fetch(url);
-                    const data = await res.json();
-                    
-                    if (!data.success) {
-                        success = false;
-                        showToast('❌ 儲存失敗：' + (data.error || ''));
-                        break;
-                    }
-                    
-                    // 更新進度
-                    if (batches.length > 1) {
-                        showToast(`💾 儲存中... (${i + 1}/${batches.length})`);
-                    }
-                }
-                
-                if (success) {
-                    showToast('✅ 已儲存');
+                    showToast(msg);
+                    console.log('儲存結果:', data);
+                } else {
+                    showToast('❌ 儲存失敗：' + (data.error || ''));
                 }
             } catch (e) {
                 console.error('儲存錯誤:', e);
