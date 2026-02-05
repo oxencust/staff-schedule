@@ -530,7 +530,7 @@
                 <h3>💡 使用說明</h3>
                 <ul>
                     <li>點擊日期選擇「可以上班」的時段</li>
-                    <li>如果整天都可以上班，選擇「整天可上班」</li>
+                    <li>如果整天都可以上班,選擇「整天可上班」</li>
                     <li>完成後點擊「送出」按鈕</li>
                 </ul>
             </div>
@@ -714,6 +714,7 @@
         let isOvertimeMode = false;  // 是否在回填模式
         let lastMonthSchedules = {};  // 上月排班資料
         let currentOvertimeDate = null;  // 當前回填的日期
+        let currentMonthSchedules = {};  // 儲存當月管理端排好的班表
 
         window.onload = async function() {
             const urlParams = new URLSearchParams(window.location.search);
@@ -729,10 +730,14 @@
             await loadShifts();
             holidays = await fetchHolidays(currentYear);
             
-            // 優先從 API 載入已送出的資料，否則從 localStorage 載入草稿
             const loaded = await loadSavedAvailability();
             if (!loaded) {
                 loadLocalData();
+            }
+            
+            // 🆕 載入當月排班資料
+            if (staffName) {
+                await loadCurrentMonthSchedule();
             }
             
             generateCalendar();
@@ -741,10 +746,9 @@
             document.getElementById('loadingScreen').classList.add('hidden');
             document.getElementById('mainContent').style.display = 'block';
             
-            // 檢查是否需要回填加班（1-4號期間）
             if (staffName) {
                 checkOvertimeReminder();
-                loadMyLeaveRecords();  // 載入請假記錄
+                loadMyLeaveRecords();
             }
         };
         
@@ -886,8 +890,8 @@
                 return;
             }
             
-            if (hours <= 0 || hours > 8) {
-                showToast('請假時數必須在 0.5~8 小時之間');
+            if (hours <= 0 || hours > 8 || hours % 0.5 !== 0) {
+                showToast('請假時數必須在 0.5~8 小時之間，且為0.5的倍數');
                 return;
             }
             
@@ -1032,6 +1036,30 @@
                 }
             } catch (e) {
                 console.error('載入上月排班失敗', e);
+            }
+        }
+        
+        async function loadCurrentMonthSchedule() {
+            if (!API_URL) return;
+            
+            try {
+                const monthStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
+                const res = await fetch(API_URL + '?action=getSchedules&month=' + monthStr);
+                const data = await res.json();
+                
+                if (data.success && data.schedules) {
+                    // 過濾出自己的排班
+                    currentMonthSchedules = {};
+                    for (const dateStr in data.schedules) {
+                        const mySchedule = data.schedules[dateStr].find(s => s.staffName === staffName);
+                        if (mySchedule) {
+                            currentMonthSchedules[dateStr] = mySchedule;
+                        }
+                    }
+                    console.log('✅ 已載入當月排班:', Object.keys(currentMonthSchedules).length, '天');
+                }
+            } catch (e) {
+                console.error('載入當月排班失敗', e);
             }
         }
         
@@ -1417,15 +1445,21 @@
             const availData = availableDates[dateStr];
             const isAvailable = availData && (availData.allDay || (availData.shifts && availData.shifts.length > 0) || availData.customTime);
             if (isAvailable) cell.classList.add('available');
-            
+
+            // 🆕 取得當月排班資料
+            const mySchedule = currentMonthSchedules[dateStr];
+
             let html = `<div class="day-header"><div class="day-number">${date.getDate()}</div></div>`;
             if (holidayInfo) html += `<span class="status-label holiday-label">${holidayInfo.name}</span>`;
             else if (isWeekend) html += `<span class="status-label weekend-label">休</span>`;
-            
+
+            // 🆕 顯示自己填的可上班時間
             if (availData) {
+                html += '<div style="margin-top: 2px;">';
+                html += '<div style="font-size: 9px; color: #666; margin-bottom: 2px;">我可上：</div>';
                 html += '<div class="shift-badges">';
                 if (availData.allDay) {
-                    html += `<div class="available-icon">✓</div>`;
+                    html += `<span class="shift-badge" style="background: var(--pink); color: white;">整天</span>`;
                 } else {
                     if (availData.shifts && availData.shifts.length > 0) {
                         availData.shifts.forEach(shiftId => {
@@ -1437,9 +1471,42 @@
                         html += `<span class="shift-badge" style="background: #999; color: white;">${availData.customTime}</span>`;
                     }
                 }
-                html += '</div>';
+                html += '</div></div>';
             }
-            
+
+            // 🆕 顯示管理端排好的班
+            if (mySchedule && isCurrentMonth) {
+                const shift = shifts.find(s => s.id === mySchedule.shiftId);
+                let shiftName = shift ? shift.name : mySchedule.shiftName || mySchedule.shiftId;
+                let shiftColor = shift ? shift.color : '#4b5563';
+                
+                // 如果是自訂班別，顯示時間
+                if (mySchedule.shiftId && mySchedule.shiftId.startsWith('custom_')) {
+                    const timeMatch = mySchedule.shiftName ? mySchedule.shiftName.match(/(\d{2}:\d{2})-(\d{2}:\d{2})/) : null;
+                    if (timeMatch) {
+                        shiftName = timeMatch[0];  // 只顯示時間
+                        shiftColor = '#a78bfa';  // 紫色
+                    }
+                }
+                
+                html += '<div style="margin-top: 4px; padding-top: 4px; border-top: 1px dashed #ddd;">';
+                html += '<div style="font-size: 9px; color: #666; margin-bottom: 2px;">已排班：</div>';
+                html += `<div class="shift-badges">`;
+                html += `<span class="shift-badge" style="background: ${shiftColor}; color: white;">${shiftName}</span>`;
+                
+                // 顯示加班/請假標記
+                if (mySchedule.overtimeStart && mySchedule.overtimeEnd) {
+                    const otStatus = mySchedule.overtimeStatus === '已審核' ? '✓' : '⏳';
+                    html += `<span class="shift-badge" style="background: #f59e0b; color: white;">+班${otStatus}</span>`;
+                }
+                if (mySchedule.leaveType && mySchedule.leaveHours > 0) {
+                    const leaveIcon = getLeaveIcon(mySchedule.leaveType);
+                    html += `<span class="shift-badge" style="background: #9ca3af; color: white;">${leaveIcon}${mySchedule.leaveHours}h</span>`;
+                }
+                
+                html += '</div></div>';
+            }
+
             cell.innerHTML = html;
             if (isCurrentMonth) cell.onclick = () => openShiftModal(dateStr);
             return cell;
@@ -1565,6 +1632,10 @@
                 const startTime = document.getElementById('customStartTime').value;
                 const endTime = document.getElementById('customEndTime').value;
                 if (startTime && endTime) {
+                    if (startTime >= endTime) {
+                        showToast('⚠️ 結束時間必須大於開始時間');
+                        return;
+                    }
                     customTime = `${startTime}-${endTime}`;
                 }
             }
@@ -1622,7 +1693,6 @@
         }
 
         async function previousMonth() {
-            // 回填模式只能看上月
             if (isOvertimeMode) {
                 showToast('⚠️ 回填模式只能操作上月');
                 return;
@@ -1630,12 +1700,17 @@
             showToast('⏳ 載入中...');
             currentMonth--;
             if (currentMonth < 0) { currentMonth = 11; currentYear--; holidays = await fetchHolidays(currentYear); }
+            
+            // 🆕 重新載入排班
+            if (staffName) {
+                await loadCurrentMonthSchedule();
+            }
+            
             generateCalendar(); 
             updateStats();
         }
 
         async function nextMonth() {
-            // 回填模式只能看上月
             if (isOvertimeMode) {
                 showToast('⚠️ 回填模式只能操作上月');
                 return;
@@ -1643,6 +1718,12 @@
             showToast('⏳ 載入中...');
             currentMonth++;
             if (currentMonth > 11) { currentMonth = 0; currentYear++; holidays = await fetchHolidays(currentYear); }
+            
+            // 🆕 重新載入排班
+            if (staffName) {
+                await loadCurrentMonthSchedule();
+            }
+            
             generateCalendar(); 
             updateStats();
         }
