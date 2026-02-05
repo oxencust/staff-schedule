@@ -602,15 +602,7 @@
                 <div style="margin-bottom: 15px;">
                     <label style="display: block; font-size: 13px; color: #666; margin-bottom: 5px;">假別</label>
                     <select id="leaveTypeSelect" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px;">
-                        <option value="特休">🌴 特休</option>
-                        <option value="病假">🏥 病假</option>
-                        <option value="事假">📝 事假</option>
-                        <option value="補休">🔄 補休</option>
-                        <option value="婚假">💒 婚假</option>
-                        <option value="喪假">🕯️ 喪假</option>
-                        <option value="產假">👶 產假</option>
-                        <option value="陪產假">👨‍👶 陪產假</option>
-                        <option value="公假">🏛️ 公假</option>
+                        <option value="">載入中...</option>
                     </select>
                 </div>
                 <div style="margin-bottom: 15px;">
@@ -795,19 +787,8 @@
                     statusColor = '#ef4444';
                 }
                 
-                // 假別 icon
-                let leaveIcon = '📝';
-                switch (record.leaveType) {
-                    case '特休': leaveIcon = '🌴'; break;
-                    case '病假': leaveIcon = '🏥'; break;
-                    case '事假': leaveIcon = '📝'; break;
-                    case '補休': leaveIcon = '🔄'; break;
-                    case '婚假': leaveIcon = '💒'; break;
-                    case '喪假': leaveIcon = '🕯️'; break;
-                    case '產假': leaveIcon = '👶'; break;
-                    case '陪產假': leaveIcon = '👨‍👶'; break;
-                    case '公假': leaveIcon = '🏛️'; break;
-                }
+                // 使用統一的假別圖示函數
+                const leaveIcon = getLeaveIcon(record.leaveType);
                 
                 html += `<div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: #f9fafb; border-radius: 8px; margin-bottom: 8px;">
                     <div>
@@ -1279,13 +1260,61 @@
             try {
                 const res = await fetch(API_URL + '?action=getShifts');
                 const data = await res.json();
-                if (data.success && data.shifts) { shifts = data.shifts; }
+                if (data.success && data.shifts) { 
+                    shifts = data.shifts;
+                    // 載入假別選項
+                    loadLeaveOptions(data.shifts);
+                }
             } catch (e) {
                 shifts = [
                     { id: 'shift1', name: '午班', time: '12:00-18:00', color: '#9fcccc' },
                     { id: 'shift2', name: '晚班', time: '18:00-22:00', color: '#a78bfa' }
                 ];
+                // 即使失敗也載入預設假別
+                loadLeaveOptions([]);
             }
+        }
+        
+        // 載入假別選項到下拉選單
+        function loadLeaveOptions(allShifts) {
+            const select = document.getElementById('leaveTypeSelect');
+            if (!select) return;
+            
+            // 過濾出假別
+            const leaveTypes = allShifts.filter(s => s.isLeave);
+            
+            // 如果管理端沒有設定假別，使用預設假別
+            if (leaveTypes.length === 0) {
+                leaveTypes.push(
+                    { leaveType: '特休', name: '特休' },
+                    { leaveType: '病假', name: '病假' },
+                    { leaveType: '事假', name: '事假' },
+                    { leaveType: '補休', name: '補休' }
+                );
+            }
+            
+            // 產生選項
+            select.innerHTML = leaveTypes.map(leave => {
+                const icon = getLeaveIcon(leave.leaveType || leave.name);
+                const typeName = leave.leaveType || leave.name;
+                return `<option value="${typeName}">${icon} ${typeName}</option>`;
+            }).join('');
+        }
+        
+        // 取得假別對應的圖示
+        function getLeaveIcon(leaveType) {
+            const iconMap = {
+                '特休': '🌴',
+                '病假': '🏥',
+                '事假': '📝',
+                '補休': '🔄',
+                '婚假': '💒',
+                '喪假': '🕯️',
+                '產假': '👶',
+                '陪產假': '👨‍👶',
+                '公假': '🏛️'
+            };
+            return iconMap[leaveType] || '📝';
         }
 
         async function fetchHolidays(year) {
