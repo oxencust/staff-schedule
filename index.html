@@ -378,7 +378,7 @@
 </head>
 <body>
     <nav class="navbar">
-        <h1>📋 衡點-排班管理系統 v6</h1>
+        <h1>📋 衡點-排班管理系統</h1>
         <span class="api-status" id="apiStatus">未連線</span>
     </nav>
 
@@ -1634,7 +1634,7 @@
                         <input type="text" class="note-input" data-staff="${staff.name}" value="${note}" placeholder="備註" style="width:50px;">
                         
                         <!-- 加班時間選擇器 -->
-                        <div class="overtime-control" style="display:${isLeaveSelected || isCustomScheduled ? 'none' : 'flex'};align-items:center;gap:2px;">
+                        <div class="overtime-control" style="display:${isLeaveSelected ? 'none' : 'flex'};align-items:center;gap:2px;">
                             <select class="overtime-start" data-staff="${staff.name}" style="width:65px;font-size:11px;padding:2px;">
                                 <option value="">無加班</option>
                                 ${generateTimeOptions(overtimeStart)}
