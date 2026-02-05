@@ -1309,12 +1309,30 @@
                         stats[item.staffName].leaveHours += leaveHours;
                         stats[item.staffName].days += 1;
                     } else {
-                        const workInfo = shift ? calculateWorkHours(shift.time) : { rawHours: 0, breakMinutes: 0, netHours: 0 };
-                        
-                        let overtime = 0;
-                        if (item.overtimeStart && item.overtimeEnd && item.overtimeStatus === '已審核') {
-                            overtime = calculateOvertimeHours(item.overtimeStart, item.overtimeEnd);
-                        }
+    // 一般班別：計算工時
+    let workInfo;
+    
+    if (shift && shift.time) {
+        // 有找到班別且有時間
+        workInfo = calculateWorkHours(shift.time);
+    } else if (item.shiftName && item.shiftName.startsWith('自訂')) {
+        // 自訂班別：從 shiftName 解析時間
+        const timeMatch = item.shiftName.match(/(\d{2}:\d{2})-(\d{2}:\d{2})/);
+        if (timeMatch) {
+            const customTime = timeMatch[0]; // 例如：14:00-20:00
+            workInfo = calculateWorkHours(customTime);
+        } else {
+            workInfo = { rawHours: 0, breakMinutes: 0, netHours: 0 };
+        }
+    } else {
+        workInfo = { rawHours: 0, breakMinutes: 0, netHours: 0 };
+    }
+    
+    // 計算加班時數（只計算已審核的）
+    let overtime = 0;
+    if (item.overtimeStart && item.overtimeEnd && item.overtimeStatus === '已審核') {
+        overtime = calculateOvertimeHours(item.overtimeStart, item.overtimeEnd);
+    }
                         
                         let appliedLeaveHours = 0;
                         if (item.leaveType && item.leaveHours && item.leaveHours > 0) {
