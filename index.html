@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>衡點-排班管理系統</title>
+    <title>衡點-排班管理系統 v6</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&display=swap');
         
@@ -378,7 +378,7 @@
 </head>
 <body>
     <nav class="navbar">
-        <h1>📋 衡點-排班管理系統</h1>
+        <h1>📋 衡點-排班管理系統 v6</h1>
         <span class="api-status" id="apiStatus">未連線</span>
     </nav>
 
@@ -446,7 +446,7 @@
         <div class="container">
             <div class="settings-panel">
                 <h3>⏰ 加班審核</h3>
-                <p style="font-size: 13px; color: #666; margin-bottom: 15px;">審核員工回填的加班時間，通過後才計入工時統計</p>
+                <p style="font-size: 13px; color: #666; margin-bottom: 15px;">審核員工回填的加班時間，通過後才計入工時統計並同步排班日曆</p>
                 <button class="btn btn-secondary" onclick="loadPendingOvertime()" style="margin-bottom: 15px;">🔄 重新整理</button>
                 <div id="overtimeReviewContainer">
                     <div class="loading"><div class="spinner"></div>載入中...</div>
@@ -534,7 +534,7 @@
 
     <script>
         // ============ 設定區（請在這裡修改）============
-        const API_URL = 'https://script.google.com/macros/s/AKfycbyOSnqSRqGJG_8_4XxlvtOhhzjUBd2b7onysKfsYpD8cGDYf9tlXuupABcNmMM-9KIswA/exec';
+        const API_URL = 'https://script.google.com/macros/s/AKfycbxNen6pisIW8fRBtiGPwfYHhgXP_OdtKes7L2wlJAPkR71nvxW_5JAXk9hDbZ9LNPu_bw/exec';
         
         let staffList = [];
         let shifts = [];
@@ -543,39 +543,205 @@
         let holidays = [];
         let schedule = {};
         let currentEditingDate = null;
+        let savedMonths = [];  // ✨ 新增：追蹤已儲存的月份
 
         window.onload = async function() {
+            // 載入已儲存月份記錄
+            const saved = localStorage.getItem('savedMonths');
+            if (saved) savedMonths = JSON.parse(saved);
+            
             await loadAllData();
             holidays = await fetchHolidays(currentYear);
             
-            // 優先從 API 載入排班，失敗才用 localStorage
-            const loaded = await loadScheduleFromAPI();
-            if (!loaded) {
-                loadLocalSchedule();
-            }
+            // ✨ 新邏輯：優先從 API 載入，如果沒資料才自動排班
+            await loadScheduleData(getCurrentMonthStr());
             
             generateCalendar();
             updateLegend();
             updateApiStatus();
         };
         
-        // 從 API 載入排班資料
-        async function loadScheduleFromAPI() {
-            if (!API_URL) return false;
+        // ============ 🆕 自動排班核心功能 ============
+        
+        // 取得當前月份字串
+        function getCurrentMonthStr() {
+            return `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
+        }
+        
+        // 載入排班資料（整合 API + 自動排班）
+        async function loadScheduleData(monthStr) {
+            console.log('📅 載入月份:', monthStr);
+            
+            // 1️⃣ 優先從 API 載入
+            const apiData = await loadScheduleFromAPI(monthStr);
+            
+            // 2️⃣ 檢查是否已儲存過
+            if (savedMonths.includes(monthStr)) {
+                console.log('✅ 已儲存月份，載入儲存資料');
+                // 已儲存：從 localStorage 載入，合併 API 的加班/請假
+                const localData = loadLocalSchedule();
+                schedule = mergeScheduleData(localData, apiData, 'local-priority');
+            } else {
+                console.log('🆕 新月份，執行自動排班');
+                // 新月份：先自動排班
+                autoScheduleFromAvailability(monthStr);
+                
+                // 合併 API 資料（加班/請假）
+                schedule = mergeScheduleData(schedule, apiData, 'api-priority');
+                
+                // 如果 API 有資料，標記為已儲存
+                if (Object.keys(apiData).length > 0) {
+                    savedMonths.push(monthStr);
+                    localStorage.setItem('savedMonths', JSON.stringify(savedMonths));
+                }
+            }
+        }
+        
+        // 🤖 自動排班：根據員工可上班時段自動排入班表
+        function autoScheduleFromAvailability(monthStr) {
+            console.log('🤖 開始自動排班...');
+            
+            staffList.forEach(staff => {
+                if (!staff.availability) return;
+                
+                // 解析可上班時段
+                const availDates = parseAvailability(staff.availability, monthStr);
+                
+                availDates.forEach(({ date, shifts: availShifts }) => {
+                    if (!schedule[date]) schedule[date] = [];
+                    
+                    // 檢查該員工該日是否已排班（避免重複）
+                    const existingSchedule = schedule[date].find(s => s.staffName === staff.name);
+                    if (existingSchedule) return;
+                    
+                    // 根據可上班時段自動排入
+                    if (availShifts === '整天') {
+                        // 整天：排所有班別
+                        const regularShifts = shifts.filter(s => !s.isLeave);
+                        regularShifts.forEach(shift => {
+                            schedule[date].push({
+                                staffName: staff.name,
+                                shiftId: shift.id,
+                                shiftName: shift.name,
+                                overtime: 0,
+                                overtimeStart: '',
+                                overtimeEnd: '',
+                                overtimeStatus: '',
+                                leaveHours: 0,
+                                note: ''
+                            });
+                        });
+                    } else if (availShifts.includes(':')) {
+                        // 自訂時間：建立臨時自訂班別
+                        const customShiftId = 'custom_' + date + '_' + staff.name;
+                        schedule[date].push({
+                            staffName: staff.name,
+                            shiftId: customShiftId,
+                            shiftName: '自訂 ' + availShifts,
+                            overtime: 0,
+                            overtimeStart: '',
+                            overtimeEnd: '',
+                            overtimeStatus: '',
+                            leaveHours: 0,
+                            note: ''
+                        });
+                    } else {
+                        // 特定時段：找到對應班別排入
+                        const shiftNames = availShifts.split('+');
+                        shiftNames.forEach(shiftName => {
+                            const shift = shifts.find(s => s.name.includes(shiftName) || shiftName.includes(s.name));
+                            if (shift) {
+                                schedule[date].push({
+                                    staffName: staff.name,
+                                    shiftId: shift.id,
+                                    shiftName: shift.name,
+                                    overtime: 0,
+                                    overtimeStart: '',
+                                    overtimeEnd: '',
+                                    overtimeStatus: '',
+                                    leaveHours: 0,
+                                    note: ''
+                                });
+                            }
+                        });
+                    }
+                });
+            });
+            
+            console.log('✅ 自動排班完成，共', Object.keys(schedule).length, '天有排班');
+        }
+        
+        // 解析員工可上班時段
+        function parseAvailability(availStr, monthStr) {
+            const result = [];
+            const lines = availStr.split('\n');
+            
+            lines.forEach(line => {
+                // 格式：2026-02-05(整天) 或 2026-02-05(午班+晚班) 或 2026-02-05(14:00-20:00)
+                const match = line.match(/(\d{4}-\d{2}-\d{2})\(([^)]+)\)/);
+                if (match && match[1].startsWith(monthStr)) {
+                    result.push({
+                        date: match[1],
+                        shifts: match[2]
+                    });
+                }
+            });
+            
+            return result;
+        }
+        
+        // 合併排班資料（localStorage + API）
+        function mergeScheduleData(base, supplement, priority) {
+            const merged = JSON.parse(JSON.stringify(base));  // 深拷貝
+            
+            for (const date in supplement) {
+                if (!merged[date]) merged[date] = [];
+                
+                supplement[date].forEach(apiItem => {
+                    const existing = merged[date].find(x => x.staffName === apiItem.staffName);
+                    
+                    if (existing) {
+                        // 更新加班/請假資訊（API 的加班請假資料優先）
+                        if (apiItem.overtimeStart) existing.overtimeStart = apiItem.overtimeStart;
+                        if (apiItem.overtimeEnd) existing.overtimeEnd = apiItem.overtimeEnd;
+                        if (apiItem.overtimeStatus) existing.overtimeStatus = apiItem.overtimeStatus;
+                        if (apiItem.leaveType) existing.leaveType = apiItem.leaveType;
+                        if (apiItem.leaveHours) existing.leaveHours = apiItem.leaveHours;
+                        
+                        // 如果是 API 優先模式，也更新班別
+                        if (priority === 'api-priority' && apiItem.shiftId) {
+                            existing.shiftId = apiItem.shiftId;
+                            existing.shiftName = apiItem.shiftName;
+                        }
+                    } else {
+                        // 新增（API 有但 localStorage 沒有）
+                        merged[date].push(apiItem);
+                    }
+                });
+            }
+            
+            return merged;
+        }
+        
+        // ============ 原有功能（修改部分）============
+        
+        // 從 API 載入排班資料（返回資料而不直接覆蓋 schedule）
+        async function loadScheduleFromAPI(monthStr) {
+            if (!monthStr) monthStr = getCurrentMonthStr();
+            if (!API_URL) return {};
             
             try {
-                const monthStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
                 const res = await fetch(API_URL + '?action=getSchedules&month=' + monthStr);
                 const data = await res.json();
                 
                 if (data.success && data.schedules) {
-                    schedule = data.schedules;
-                    return Object.keys(schedule).length > 0;
+                    console.log('從 API 載入', Object.keys(data.schedules).length, '天排班資料');
+                    return data.schedules;
                 }
             } catch (e) {
                 console.error('從 API 載入排班失敗', e);
             }
-            return false;
+            return {};
         }
         
         async function updateApiStatus() {
@@ -681,7 +847,6 @@
                 if (data.success) { 
                     showToast('✅ 員工類型已更新'); 
                     closeModal('editStaffModal'); 
-                    // 更新本地資料
                     const staff = staffList.find(s => s.name === name);
                     if (staff) staff.staffType = staffType;
                     renderStaffList();
@@ -712,7 +877,7 @@
         }
         
         // ============ 員工類型管理 ============
-        let staffTypes = ['正職', 'PT', '半薪正職'];  // 預設值
+        let staffTypes = ['正職', 'PT', '半薪正職'];
         
         async function loadStaffTypes() {
             if (!API_URL) return;
@@ -807,13 +972,11 @@
             const container = document.getElementById('shiftList');
             if (shifts.length === 0) { container.innerHTML = '<p style="color: #666;">尚無班別設定</p>'; return; }
             
-            // 分開顯示班別和假別
             const regularShifts = shifts.filter(s => !s.isLeave);
             const leaveShifts = shifts.filter(s => s.isLeave);
             
             let html = '';
             
-            // 一般班別
             if (regularShifts.length > 0) {
                 html += '<div style="font-size:12px;color:#666;margin-bottom:8px;font-weight:600;">📋 一般班別</div>';
                 regularShifts.forEach((shift, i) => {
@@ -829,7 +992,6 @@
                 });
             }
             
-            // 假別
             if (leaveShifts.length > 0) {
                 html += '<div style="font-size:12px;color:#666;margin:15px 0 8px 0;font-weight:600;padding-top:10px;border-top:1px dashed #ddd;">🏥 假別設定</div>';
                 leaveShifts.forEach((shift, i) => {
@@ -891,7 +1053,6 @@
                     if (item !== draggedItem) {
                         const fromIndex = parseInt(draggedItem.dataset.index);
                         const toIndex = parseInt(item.dataset.index);
-                        // 重新排序
                         const movedItem = shifts.splice(fromIndex, 1)[0];
                         shifts.splice(toIndex, 0, movedItem);
                         renderShiftList();
@@ -945,15 +1106,12 @@
 
         async function fetchHolidays(year) {
             try {
-                // 直接使用 ruyut 的 Taiwan Calendar API（免 CORS、快速穩定）
                 const res = await fetch('https://cdn.jsdelivr.net/gh/ruyut/TaiwanCalendar/data/' + year + '.json');
                 const data = await res.json();
                 if (data && Array.isArray(data)) {
                     const holidays = [];
                     data.forEach(record => {
-                        // 只取有節日名稱的假日（排除一般週末）
                         if (record.isHoliday && record.description && record.description.trim() !== '') {
-                            // 轉換日期格式 20260101 → 2026-01-01
                             const d = record.date;
                             const formattedDate = d.substring(0, 4) + '-' + d.substring(4, 6) + '-' + d.substring(6, 8);
                             holidays.push({ date: formattedDate, name: record.description });
@@ -1016,20 +1174,18 @@
                     schedule[dateStr].forEach(item => {
                         const shift = shifts.find(s => s.id === item.shiftId);
                         const color = shift ? shift.color : '#999';
-                        const shiftName = shift ? shift.name : item.shiftId;
+                        const shiftName = shift ? shift.name : (item.shiftName || item.shiftId);
                         const isLeave = shift && shift.isLeave;
                         const note = item.note ? `（${item.note}）` : '';
                         
                         html += '<div class="schedule-item-full" style="background: ' + color + ';">';
                         
                         if (isLeave) {
-                            // 假別：顯示請假時數
                             const leaveIcon = shift.leaveType === '病假' ? '🏥' : shift.leaveType === '事假' ? '📝' : shift.leaveType === '特休' ? '🌴' : '🎉';
                             const leaveHours = item.leaveHours || 8;
                             html += '<div>' + item.staffName + ' ' + leaveIcon + shiftName + note + '</div>';
                             html += '<div class="time">' + leaveHours + '小時</div>';
                         } else {
-                            // 一般班別：顯示時段和加班
                             const shiftTime = shift ? shift.time : '';
                             let overtimeDisplay = '';
                             if (item.overtimeStart && item.overtimeEnd && item.overtimeStatus === '已審核') {
@@ -1040,7 +1196,6 @@
                                 overtimeDisplay = ` <span style="color:#f59e0b;">+${otHours}h⏳</span>`;
                             }
                             
-                            // 請假申請標記（半天假情況）
                             let leaveDisplay = '';
                             if (item.leaveType && item.leaveHours && item.leaveHours > 0) {
                                 const leaveIcon = item.leaveType === '病假' ? '🏥' : item.leaveType === '事假' ? '📝' : item.leaveType === '特休' ? '🌴' : item.leaveType === '補休' ? '🔄' : '🎉';
@@ -1065,7 +1220,6 @@
             updateStats();
         }
         
-        // 計算工時（返回詳細資訊）
         function calculateWorkHours(timeStr) {
             if (!timeStr || !timeStr.includes('-')) return { rawHours: 0, breakMinutes: 0, netHours: 0 };
             const [start, end] = timeStr.split('-');
@@ -1073,16 +1227,15 @@
             const [endH, endM] = end.split(':').map(Number);
             
             let totalMinutes = (endH * 60 + endM) - (startH * 60 + startM);
-            if (totalMinutes < 0) totalMinutes += 24 * 60; // 跨日
+            if (totalMinutes < 0) totalMinutes += 24 * 60;
             
             const rawHours = totalMinutes / 60;
             
-            // 扣除休息時間：超過4小時休30分鐘，9小時以上休1小時
             let breakMinutes = 0;
             if (rawHours >= 9) {
-                breakMinutes = 60; // 9小時以上休1小時
+                breakMinutes = 60;
             } else if (rawHours > 4) {
-                breakMinutes = 30; // 超過4小時休30分鐘
+                breakMinutes = 30;
             }
             
             const netMinutes = totalMinutes - breakMinutes;
@@ -1091,7 +1244,6 @@
             return { rawHours, breakMinutes, netHours };
         }
         
-        // 計算當月工作日數（排除週末和假日）
         function getWorkDays(year, month) {
             let workDays = 0;
             const lastDay = new Date(year, month, 0).getDate();
@@ -1108,12 +1260,11 @@
             return workDays;
         }
 
-        // 根據員工類型計算應排時數
         function getRequiredHours(staffType, workDays) {
             switch (staffType) {
                 case '正職': return workDays * 8;
                 case '半薪正職': return (workDays * 8) / 2;
-                case 'PT': return null; // 無固定
+                case 'PT': return null;
                 default: return null;
             }
         }
@@ -1122,14 +1273,11 @@
             const statsGrid = document.getElementById('statsGrid');
             if (!statsGrid) return;
             
-            // 計算當月工作日數
             const workDays = getWorkDays(currentYear, currentMonth + 1);
             
-            // 統計當月每個員工的天數和時數
             const stats = {};
             const monthStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
             
-            // 初始化所有員工
             staffList.forEach(staff => {
                 const staffType = staff.staffType || 'PT';
                 const requiredHours = getRequiredHours(staffType, workDays);
@@ -1140,7 +1288,6 @@
                 };
             });
             
-            // 計算排班資料
             for (const dateStr in schedule) {
                 if (!dateStr.startsWith(monthStr)) continue;
                 
@@ -1158,21 +1305,17 @@
                     const isLeave = shift && shift.isLeave;
                     
                     if (isLeave) {
-                        // 假別：計算請假時數
                         const leaveHours = item.leaveHours || 8;
                         stats[item.staffName].leaveHours += leaveHours;
                         stats[item.staffName].days += 1;
                     } else {
-                        // 一般班別：計算工時
                         const workInfo = shift ? calculateWorkHours(shift.time) : { rawHours: 0, breakMinutes: 0, netHours: 0 };
                         
-                        // 計算加班時數（只計算已審核的）
                         let overtime = 0;
                         if (item.overtimeStart && item.overtimeEnd && item.overtimeStatus === '已審核') {
                             overtime = calculateOvertimeHours(item.overtimeStart, item.overtimeEnd);
                         }
                         
-                        // 檢查是否有請假申請通過（半天假情況）
                         let appliedLeaveHours = 0;
                         if (item.leaveType && item.leaveHours && item.leaveHours > 0) {
                             appliedLeaveHours = Number(item.leaveHours) || 0;
@@ -1182,25 +1325,20 @@
                         stats[item.staffName].days += 1;
                         stats[item.staffName].rawHours += workInfo.rawHours;
                         stats[item.staffName].breakMinutes += workInfo.breakMinutes;
-                        // 實際工時 = 班別工時 - 請假時數
                         stats[item.staffName].netHours += (workInfo.netHours - appliedLeaveHours);
                         stats[item.staffName].overtime += overtime;
                         
-                        // 統計休息次數
                         if (workInfo.breakMinutes === 30) stats[item.staffName].break30 += 1;
                         if (workInfo.breakMinutes === 60) stats[item.staffName].break60 += 1;
                     }
                     
-                    // 統計各班別次數
-                    const shiftName = shift ? shift.name : item.shiftId;
+                    const shiftName = shift ? shift.name : (item.shiftName || item.shiftId);
                     stats[item.staffName].shifts[shiftName] = (stats[item.staffName].shifts[shiftName] || 0) + 1;
                 });
             }
             
-            // 渲染統計卡片
             let html = '';
             
-            // 顯示當月工作日資訊
             html += `<div style="grid-column: 1 / -1; padding: 10px 15px; background: var(--green-light); border-radius: 8px; margin-bottom: 10px; font-size: 13px;">
                 <strong>📅 ${currentYear}年${currentMonth + 1}月</strong>：工作日 ${workDays} 天，正職應排 ${workDays * 8}h，半薪應排 ${(workDays * 8) / 2}h
             </div>`;
@@ -1214,14 +1352,12 @@
                     const s = stats[name];
                     if (s.days === 0) return;
                     
-                    // 確保數值類型
                     const netHours = Number(s.netHours) || 0;
                     const overtime = Number(s.overtime) || 0;
                     const totalHours = netHours + overtime;
                     const breakHours = (Number(s.breakMinutes) || 0) / 60;
                     const shiftSummary = Object.entries(s.shifts).map(([k, v]) => `${k}×${v}`).join('、');
                     
-                    // 休息次數明細
                     let breakDetail = '';
                     if (s.break30 > 0 || s.break60 > 0) {
                         const parts = [];
@@ -1230,10 +1366,9 @@
                         breakDetail = parts.join('、');
                     }
                     
-                    // 計算差異（應排 vs 已排）
                     let diffHtml = '';
                     if (s.requiredHours !== null) {
-                        const actualHours = totalHours + s.leaveHours; // 請假也算已排
+                        const actualHours = totalHours + s.leaveHours;
                         const diff = actualHours - s.requiredHours;
                         const diffColor = diff >= 0 ? '#10b981' : '#ef4444';
                         const diffText = diff >= 0 ? `+${diff.toFixed(1)}（可補休）` : `${diff.toFixed(1)}（需補班）`;
@@ -1248,7 +1383,6 @@
                             </div>`;
                     }
                     
-                    // 員工類型標籤
                     const typeColor = s.staffType === '正職' ? '#10b981' : s.staffType === '半薪正職' ? '#3b82f6' : '#9ca3af';
                     const typeBadge = `<span style="font-size:10px;padding:2px 6px;border-radius:3px;background:${typeColor};color:white;margin-left:8px;">${s.staffType}</span>`;
                     
@@ -1306,7 +1440,6 @@
             }).join('');
         }
         
-        // 生成時間下拉選項（從 06:00 到 23:30，每 30 分鐘）
         function generateTimeOptions(selectedValue) {
             let options = '';
             for (let h = 6; h <= 23; h++) {
@@ -1319,7 +1452,6 @@
             return options;
         }
         
-        // 計算加班時數（從開始時間到結束時間）
         function calculateOvertimeHours(startTime, endTime) {
             if (!startTime || !endTime) return 0;
             const [startH, startM] = startTime.split(':').map(Number);
@@ -1327,7 +1459,7 @@
             const startMinutes = startH * 60 + startM;
             const endMinutes = endH * 60 + endM;
             const diffMinutes = endMinutes - startMinutes;
-            return Math.round(diffMinutes / 30) / 2;  // 以 0.5 小時為單位
+            return Math.round(diffMinutes / 30) / 2;
         }
 
         function openScheduleModal(dateStr) {
@@ -1344,7 +1476,6 @@
             } else {
                 let html = '';
                 staffList.forEach(staff => {
-                    // 檢查該員工當天是否可上班
                     const isAvailable = staff.availability && staff.availability.includes(dateStr);
                     let availInfo = '';
                     let availShiftNames = [];
@@ -1357,7 +1488,6 @@
                         availShiftNames = canAllDay ? shifts.map(s => s.name) : availInfo.split('+');
                     }
                     
-                    // 該員工當天已排的班
                     const staffSched = daySchedule.find(s => s.staffName === staff.name);
                     
                     const rowClass = isAvailable ? 'staff-shift-row can-work' : 'staff-shift-row';
@@ -1372,7 +1502,6 @@
                                 data-shift-id="" data-staff="${staff.name}" data-is-leave="false"
                                 onclick="toggleShiftBtn(this, '#9ca3af')">不排</button>`;
                     
-                    // 先顯示一般班別
                     shifts.filter(s => !s.isLeave).forEach(shift => {
                         const isSelected = staffSched && staffSched.shiftId === shift.id;
                         const btnClass = isSelected ? 'selected' : '';
@@ -1385,7 +1514,6 @@
                             onclick="toggleShiftBtn(this,'${shift.color}')">${shift.name}</button>`;
                     });
                     
-                    // 再顯示假別
                     const leaveShifts = shifts.filter(s => s.isLeave);
                     if (leaveShifts.length > 0) {
                         html += `<span style="margin-left:5px;color:#ddd;">|</span>`;
@@ -1403,7 +1531,6 @@
                         });
                     }
                     
-                    // 加班時數和請假時數
                     const overtimeStart = staffSched ? (staffSched.overtimeStart || '') : '';
                     const overtimeEnd = staffSched ? (staffSched.overtimeEnd || '') : '';
                     const leaveHours = staffSched ? (staffSched.leaveHours || 8) : 8;
@@ -1430,7 +1557,6 @@
                             </div>
                         </div>`;
                     
-                    // 顯示可上班時段資訊
                     if (isAvailable) {
                         html += `<div class="avail-shifts-info">可：${availInfo}</div>`;
                     }
@@ -1455,7 +1581,6 @@
             btn.classList.add('selected');
             btn.style.background = color;
             
-            // 切換加班/請假控制項顯示
             const isLeave = btn.dataset.isLeave === 'true';
             const overtimeControl = row.querySelector('.overtime-control');
             const leaveControl = row.querySelector('.leave-control');
@@ -1480,7 +1605,6 @@
                 const noteInput = row.querySelector('.note-input');
                 const note = noteInput ? noteInput.value.trim() : '';
                 
-                // 只有選了班別（不是「不排」）才加入排班
                 if (selectedBtn && selectedBtn.dataset.shiftId) {
                     const shiftId = selectedBtn.dataset.shiftId;
                     const isLeave = selectedBtn.dataset.isLeave === 'true';
@@ -1497,7 +1621,7 @@
                     } else if (overtimeStart && overtimeEnd) {
                         scheduleItem.overtimeStart = overtimeStart;
                         scheduleItem.overtimeEnd = overtimeEnd;
-                        scheduleItem.overtimeStatus = '已審核';  // 管理端手動輸入直接算審核通過
+                        scheduleItem.overtimeStatus = '已審核';
                     }
                     daySchedule.push(scheduleItem);
                 }
@@ -1510,12 +1634,19 @@
         }
 
         function saveLocalSchedule() { localStorage.setItem('schedule', JSON.stringify(schedule)); }
-        function loadLocalSchedule() { const saved = localStorage.getItem('schedule'); if (saved) schedule = JSON.parse(saved); }
+        function loadLocalSchedule() { 
+            const saved = localStorage.getItem('schedule'); 
+            if (saved) return JSON.parse(saved);
+            return {};
+        }
         
         function clearSchedule() {
             if (!confirm('確定要清除所有排班資料嗎？此動作無法復原！')) return;
             schedule = {};
             localStorage.removeItem('schedule');
+            const monthStr = getCurrentMonthStr();
+            savedMonths = savedMonths.filter(m => m !== monthStr);
+            localStorage.setItem('savedMonths', JSON.stringify(savedMonths));
             generateCalendar();
             showToast('🗑️ 已清除所有排班');
         }
@@ -1523,7 +1654,6 @@
         async function exportSchedule() {
             if (!API_URL) { showToast('請先設定 API'); return; }
             
-            // 極簡格式：只傳 staffName 和 shiftId，Apps Script 會查找班別資訊
             const d = {};
             const lastDay = new Date(currentYear, currentMonth + 1, 0);
             
@@ -1533,7 +1663,6 @@
                 const daySchedule = schedule[dateStr] || [];
                 
                 if (daySchedule.length > 0) {
-                    // 格式：[staffName, shiftId, overtime, note, leaveHours]
                     d[day] = daySchedule.map(item => [
                         item.staffName,
                         item.shiftId,
@@ -1549,11 +1678,9 @@
                 return; 
             }
             
-            // 整理假日列表（只取當月的日期數字）
             const monthStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
             const h = holidays.filter(x => x.date.startsWith(monthStr)).map(x => parseInt(x.date.split('-')[2]));
             
-            // 員工列表（用於固定欄位）- 按排班天數排序
             const staffStats = {};
             staffList.forEach(s => { staffStats[s.name] = 0; });
             for (const dateStr in schedule) {
@@ -1576,10 +1703,9 @@
                     m: currentMonth + 1,
                     d: d,
                     h: h,
-                    s: sortedStaffNames  // 員工名單（已排序）
+                    s: sortedStaffNames
                 };
                 
-                // 使用 POST 避免 URL 長度限制
                 const res = await fetch(API_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'text/plain' },
@@ -1596,18 +1722,25 @@
         async function prevMonth() { 
             showToast('⏳ 載入中...');
             currentMonth--; 
-            if (currentMonth < 0) { currentMonth = 11; currentYear--; holidays = await fetchHolidays(currentYear); } 
-            await loadScheduleFromAPI();
+            if (currentMonth < 0) { currentMonth = 11; currentYear--; holidays = await fetchHolidays(currentYear); }
+            await loadScheduleData(getCurrentMonthStr());
             generateCalendar(); 
         }
         async function nextMonth() { 
             showToast('⏳ 載入中...');
             currentMonth++; 
-            if (currentMonth > 11) { currentMonth = 0; currentYear++; holidays = await fetchHolidays(currentYear); } 
-            await loadScheduleFromAPI();
+            if (currentMonth > 11) { currentMonth = 0; currentYear++; holidays = await fetchHolidays(currentYear); }
+            await loadScheduleData(getCurrentMonthStr());
             generateCalendar(); 
         }
-        async function refreshData() { showToast('🔄 重新整理...'); await loadAllData(); holidays = await fetchHolidays(currentYear); generateCalendar(); showToast('✅ 已更新'); }
+        async function refreshData() { 
+            showToast('🔄 重新整理...'); 
+            await loadAllData(); 
+            holidays = await fetchHolidays(currentYear); 
+            await loadScheduleData(getCurrentMonthStr());
+            generateCalendar(); 
+            showToast('✅ 已更新'); 
+        }
 
         function formatDate(date) { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`; }
         function formatDateTime(str) {
@@ -1625,7 +1758,7 @@
         }
         function showToast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 3000); }
 
-        // ============ 加班審核功能 ============
+        // ============ 加班審核功能（✨ 審核後重載排班） ============
         let pendingOvertimes = [];
         
         async function loadPendingOvertime() {
@@ -1659,7 +1792,6 @@
             let html = `<div style="margin-bottom:10px;font-size:13px;color:#666;">共 <strong>${pendingOvertimes.length}</strong> 筆待審核</div>`;
             
             pendingOvertimes.forEach((record, index) => {
-                // 格式化時間（處理 ISO 格式或 HH:MM 格式）
                 const startTimeDisplay = formatTimeDisplay(record.startTime);
                 const endTimeDisplay = formatTimeDisplay(record.endTime);
                 const hours = calculateOvertimeHoursFromDisplay(startTimeDisplay, endTimeDisplay);
@@ -1700,21 +1832,17 @@
             container.innerHTML = html;
         }
         
-        // 格式化時間顯示（處理 ISO 或 HH:MM 格式）
         function formatTimeDisplay(timeStr) {
             if (!timeStr) return '-';
-            // 如果是 ISO 格式（含 T）
             if (timeStr.includes('T')) {
                 const date = new Date(timeStr);
                 const hours = String(date.getHours()).padStart(2, '0');
                 const minutes = String(date.getMinutes()).padStart(2, '0');
                 return `${hours}:${minutes}`;
             }
-            // 已經是 HH:MM 格式
             return timeStr;
         }
         
-        // 格式化日期顯示（處理 ISO 或 YYYY-MM-DD 格式）
         function formatDateDisplay(dateStr) {
             if (!dateStr) return '-';
             if (dateStr.includes('T')) {
@@ -1724,7 +1852,6 @@
             return dateStr;
         }
         
-        // 格式化日期時間顯示
         function formatDateTimeDisplay(dateTimeStr) {
             if (!dateTimeStr) return '-';
             if (dateTimeStr.includes('T')) {
@@ -1734,24 +1861,10 @@
             return dateTimeStr;
         }
         
-        // 從顯示格式計算加班時數
         function calculateOvertimeHoursFromDisplay(startDisplay, endDisplay) {
             if (startDisplay === '-' || endDisplay === '-') return 0;
             const [startH, startM] = startDisplay.split(':').map(Number);
             const [endH, endM] = endDisplay.split(':').map(Number);
-            if (isNaN(startH) || isNaN(endH)) return 0;
-            let minutes = (endH * 60 + endM) - (startH * 60 + startM);
-            if (minutes < 0) minutes += 24 * 60;
-            return (minutes / 60).toFixed(1);
-        }
-        
-        function calculateOvertimeHours(start, end) {
-            if (!start || !end) return 0;
-            // 處理 ISO 格式
-            if (start.includes('T')) start = formatTimeDisplay(start);
-            if (end.includes('T')) end = formatTimeDisplay(end);
-            const [startH, startM] = start.split(':').map(Number);
-            const [endH, endM] = end.split(':').map(Number);
             if (isNaN(startH) || isNaN(endH)) return 0;
             let minutes = (endH * 60 + endM) - (startH * 60 + startM);
             if (minutes < 0) minutes += 24 * 60;
@@ -1769,6 +1882,10 @@
                 if (data.success) {
                     showToast('✅ 已審核通過');
                     loadPendingOvertime();
+                    
+                    // ✨ 重新載入當月排班（更新加班資訊）
+                    await loadScheduleData(getCurrentMonthStr());
+                    generateCalendar();
                 } else {
                     showToast('❌ 審核失敗：' + (data.error || ''));
                 }
@@ -1796,7 +1913,7 @@
             }
         }
         
-        // ============ 請假審核功能 ============
+        // ============ 請假審核功能（✨ 審核後重載排班） ============
         let pendingLeaves = [];
         
         async function loadPendingLeave() {
@@ -1834,7 +1951,6 @@
                 const submitTimeDisplay = formatDateTimeDisplay(record.submitTime);
                 const reasonDisplay = record.reason ? `<div style="margin-bottom:8px;font-size:13px;background:#f3f4f6;padding:8px 10px;border-radius:6px;"><span style="color:#666;">請假原因：</span>${record.reason}</div>` : '';
                 
-                // 假別顏色
                 let leaveColor = '#9ca3af';
                 switch (record.leaveType) {
                     case '特休': leaveColor = '#10b981'; break;
@@ -1892,6 +2008,10 @@
                 if (data.success) {
                     showToast('✅ 已審核通過');
                     loadPendingLeave();
+                    
+                    // ✨ 重新載入當月排班（更新請假資訊）
+                    await loadScheduleData(getCurrentMonthStr());
+                    generateCalendar();
                 } else {
                     showToast('❌ 審核失敗：' + (data.error || ''));
                 }
@@ -1919,24 +2039,22 @@
             }
         }
         
-        // ============ 儲存到 Google Sheet ============
+        // ============ 儲存到 Google Sheet（✨ 記錄已儲存月份） ============
         async function saveToSheet() {
             if (!API_URL) { showToast('請先設定 API'); return; }
             
-            // 顯示持續的載入提示
             const loadingToast = document.getElementById('toast');
             loadingToast.innerHTML = '<div style="display:flex;align-items:center;gap:10px;"><div class="spinner" style="margin:0;width:20px;height:20px;border-width:2px;"></div><span>💾 儲存中，請稍候...</span></div>';
             loadingToast.classList.add('show');
             
             try {
-                const monthStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
+                const monthStr = getCurrentMonthStr();
                 const payload = {
                     action: 'saveSchedules',
                     month: monthStr,
                     schedules: schedule
                 };
                 
-                // 使用 POST 一次送完整月資料
                 const res = await fetch(API_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
@@ -1944,10 +2062,18 @@
                 });
                 const data = await res.json();
                 
-                // 移除載入動畫，顯示結果
                 loadingToast.classList.remove('show');
                 
                 if (data.success) {
+                    // ✨ 標記該月份已儲存
+                    if (!savedMonths.includes(monthStr)) {
+                        savedMonths.push(monthStr);
+                        localStorage.setItem('savedMonths', JSON.stringify(savedMonths));
+                    }
+                    
+                    // 同步 localStorage
+                    saveLocalSchedule();
+                    
                     let msg = '✅ 儲存完成';
                     if (data.webhookSent) {
                         msg += '，已同步至 MySQL';
@@ -1967,7 +2093,6 @@
                     showToast('❌ 儲存失敗：' + (data.error || ''));
                 }
             } catch (e) {
-                // 移除載入動畫
                 loadingToast.classList.remove('show');
                 console.error('儲存錯誤:', e);
                 showToast('❌ 儲存失敗：' + e.message);
