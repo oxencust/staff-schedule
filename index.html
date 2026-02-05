@@ -543,21 +543,32 @@
         let holidays = [];
         let schedule = {};
         let currentEditingDate = null;
-        let savedMonths = [];  // ✨ 新增：追蹤已儲存的月份
+        let savedMonths = [];
 
         window.onload = async function() {
             // 載入已儲存月份記錄
             const saved = localStorage.getItem('savedMonths');
             if (saved) savedMonths = JSON.parse(saved);
             
-            await loadAllData();
-            holidays = await fetchHolidays(currentYear);
+            // ✨ 優化 1: 先顯示載入中的日曆框架
+            generateCalendar();
             
-            // ✨ 新邏輯：優先從 API 載入，如果沒資料才自動排班
+            // ✨ 優化 2: 並行載入所有資料（同時進行，不用等待）
+            const [_, holidaysData] = await Promise.all([
+                loadAllData(),           // 載入員工、班別、員工類型
+                fetchHolidays(currentYear)  // 載入假日
+            ]);
+            
+            holidays = holidaysData;
+            
+            // ✨ 優化 3: 載入排班資料
             await loadScheduleData(getCurrentMonthStr());
             
+            // ✨ 優化 4: 更新畫面
             generateCalendar();
             updateLegend();
+            
+            // ✨ 優化 5: API 狀態檢查放到最後（非關鍵）
             updateApiStatus();
         };
         
@@ -1105,6 +1116,20 @@
         }
 
         async function fetchHolidays(year) {
+            // ✨ 優化：先檢查 localStorage 快取
+            const cacheKey = 'holidays_' + year;
+            const cached = localStorage.getItem(cacheKey);
+            if (cached) {
+                try {
+                    const cachedData = JSON.parse(cached);
+                    console.log('✅ 從快取載入 ' + year + ' 年假日：', cachedData.length + ' 筆');
+                    return cachedData;
+                } catch (e) {
+                    localStorage.removeItem(cacheKey);
+                }
+            }
+            
+            // 原本的載入邏輯
             try {
                 const res = await fetch('https://cdn.jsdelivr.net/gh/ruyut/TaiwanCalendar/data/' + year + '.json');
                 const data = await res.json();
@@ -1118,6 +1143,10 @@
                         }
                     });
                     console.log('已載入 ' + year + ' 年假日：', holidays.length + ' 筆');
+                    
+                    // ✨ 儲存到快取
+                    localStorage.setItem(cacheKey, JSON.stringify(holidays));
+                    
                     return holidays;
                 }
             } catch (e) {
@@ -1309,30 +1338,26 @@
                         stats[item.staffName].leaveHours += leaveHours;
                         stats[item.staffName].days += 1;
                     } else {
-    // 一般班別：計算工時
-    let workInfo;
-    
-    if (shift && shift.time) {
-        // 有找到班別且有時間
-        workInfo = calculateWorkHours(shift.time);
-    } else if (item.shiftName && item.shiftName.startsWith('自訂')) {
-        // 自訂班別：從 shiftName 解析時間
-        const timeMatch = item.shiftName.match(/(\d{2}:\d{2})-(\d{2}:\d{2})/);
-        if (timeMatch) {
-            const customTime = timeMatch[0]; // 例如：14:00-20:00
-            workInfo = calculateWorkHours(customTime);
-        } else {
-            workInfo = { rawHours: 0, breakMinutes: 0, netHours: 0 };
-        }
-    } else {
-        workInfo = { rawHours: 0, breakMinutes: 0, netHours: 0 };
-    }
-    
-    // 計算加班時數（只計算已審核的）
-    let overtime = 0;
-    if (item.overtimeStart && item.overtimeEnd && item.overtimeStatus === '已審核') {
-        overtime = calculateOvertimeHours(item.overtimeStart, item.overtimeEnd);
-    }
+                        let workInfo;
+                        
+                        if (shift && shift.time) {
+                            workInfo = calculateWorkHours(shift.time);
+                        } else if (item.shiftName && item.shiftName.startsWith('自訂')) {
+                            const timeMatch = item.shiftName.match(/(\d{2}:\d{2})-(\d{2}:\d{2})/);
+                            if (timeMatch) {
+                                const customTime = timeMatch[0];
+                                workInfo = calculateWorkHours(customTime);
+                            } else {
+                                workInfo = { rawHours: 0, breakMinutes: 0, netHours: 0 };
+                            }
+                        } else {
+                            workInfo = { rawHours: 0, breakMinutes: 0, netHours: 0 };
+                        }
+                        
+                        let overtime = 0;
+                        if (item.overtimeStart && item.overtimeEnd && item.overtimeStatus === '已審核') {
+                            overtime = calculateOvertimeHours(item.overtimeStart, item.overtimeEnd);
+                        }
                         
                         let appliedLeaveHours = 0;
                         if (item.leaveType && item.leaveHours && item.leaveHours > 0) {
@@ -1481,124 +1506,92 @@
         }
 
         function openScheduleModal(dateStr) {
-    currentEditingDate = dateStr;
-    const date = new Date(dateStr);
-    const dayOfWeek = ['日', '一', '二', '三', '四', '五', '六'][date.getDay()];
-    document.getElementById('scheduleDateHeader').textContent = `${dateStr} (週${dayOfWeek})`;
-    
-    const daySchedule = schedule[dateStr] || [];
-    const grid = document.getElementById('staffShiftGrid');
-    
-    if (staffList.length === 0) { 
-        grid.innerHTML = '<p style="color:#666;padding:10px;">尚無員工資料，請先新增員工</p>'; 
-    } else {
-        let html = '';
-        staffList.forEach(staff => {
-            const isAvailable = staff.availability && staff.availability.includes(dateStr);
-            let availInfo = '';
-            let availShiftNames = [];
-            let canAllDay = false;
-            let customTime = '';  // 🆕 儲存自訂時間
+            currentEditingDate = dateStr;
+            const date = new Date(dateStr);
+            const dayOfWeek = ['日', '一', '二', '三', '四', '五', '六'][date.getDay()];
+            document.getElementById('scheduleDateHeader').textContent = `${dateStr} (週${dayOfWeek})`;
             
-            if (isAvailable) {
-                const match = staff.availability.match(new RegExp(dateStr + '\\(([^)]+)\\)'));
-                availInfo = match ? match[1] : '整天';
-                canAllDay = availInfo === '整天';
-                
-                // 🆕 檢查是否為自訂時間格式（HH:MM-HH:MM）
-                if (availInfo.includes(':') && availInfo.includes('-')) {
-                    customTime = availInfo;
-                } else {
-                    availShiftNames = canAllDay ? shifts.map(s => s.name) : availInfo.split('+');
-                }
-            }
+            const daySchedule = schedule[dateStr] || [];
+            const grid = document.getElementById('staffShiftGrid');
             
-            const staffSched = daySchedule.find(s => s.staffName === staff.name);
-            
-            // 🆕 判斷是否已排自訂班別
-            const isCustomScheduled = staffSched && staffSched.shiftId.startsWith('custom_');
-            let customStartTime = '';
-            let customEndTime = '';
-            
-            if (isCustomScheduled) {
-                // 從 shiftName 解析時間（格式：自訂 14:00-20:00）
-                const timeMatch = staffSched.shiftName.match(/(\d{2}:\d{2})-(\d{2}:\d{2})/);
-                if (timeMatch) {
-                    customStartTime = timeMatch[1];
-                    customEndTime = timeMatch[2];
-                }
-            } else if (customTime) {
-                // 使用員工填寫的自訂時間作為預設值
-                const timeParts = customTime.split('-');
-                if (timeParts.length === 2) {
-                    customStartTime = timeParts[0].trim();
-                    customEndTime = timeParts[1].trim();
-                }
-            }
-            
-            const rowClass = isAvailable ? 'staff-shift-row can-work' : 'staff-shift-row';
-            
-            html += `<div class="${rowClass}" data-staff="${staff.name}">
-                <div class="staff-info">
-                    <span class="staff-name">${staff.name}</span>
-                    <span class="staff-status ${isAvailable ? 'available' : 'unavailable'}">${isAvailable ? '✓可' : '✗'}</span>
-                </div>
-                <div class="shift-buttons">
-                    <button class="shift-toggle-btn no-schedule ${!staffSched ? 'selected' : ''}" 
-                        data-shift-id="" data-staff="${staff.name}" data-is-leave="false"
-                        onclick="toggleShiftBtn(this, '#9ca3af')">不排</button>`;
-            
-            // 一般班別按鈕
-            shifts.filter(s => !s.isLeave).forEach(shift => {
-                const isSelected = staffSched && staffSched.shiftId === shift.id;
-                const btnClass = isSelected ? 'selected' : '';
-                const style = `border-color:${shift.color};${isSelected ? 'background:' + shift.color : ''}`;
-                
-                html += `<button class="shift-toggle-btn ${btnClass}" 
-                    style="${style}"
-                    data-shift-id="${shift.id}" data-staff="${staff.name}" data-is-leave="false"
-                    title="${shift.time}"
-                    onclick="toggleShiftBtn(this,'${shift.color}')">${shift.name}</button>`;
-            });
-            
-            // 🆕 自訂按鈕
-            const customBtnClass = isCustomScheduled ? 'selected' : '';
-            const customBtnStyle = isCustomScheduled ? 'border-color:#a78bfa;background:#a78bfa' : 'border-color:#a78bfa';
-            html += `<button class="shift-toggle-btn custom-shift-btn ${customBtnClass}" 
-                style="${customBtnStyle}"
-                data-shift-id="custom" data-staff="${staff.name}" data-is-leave="false"
-                onclick="toggleCustomShift(this, '${staff.name}', '#a78bfa')">⚙️ 自訂</button>`;
-            
-            // 假別按鈕
-            const leaveShifts = shifts.filter(s => s.isLeave);
-            if (leaveShifts.length > 0) {
-                html += `<span style="margin-left:5px;color:#ddd;">|</span>`;
-                leaveShifts.forEach(shift => {
-                    const isSelected = staffSched && staffSched.shiftId === shift.id;
-                    const btnClass = isSelected ? 'selected' : '';
-                    const style = `border-color:${shift.color};${isSelected ? 'background:' + shift.color : ''}`;
-                    const leaveIcon = shift.leaveType === '病假' ? '🏥' : shift.leaveType === '事假' ? '📝' : shift.leaveType === '特休' ? '🌴' : '🎉';
+            if (staffList.length === 0) { 
+                grid.innerHTML = '<p style="color:#666;padding:10px;">尚無員工資料，請先新增員工</p>'; 
+            } else {
+                let html = '';
+                staffList.forEach(staff => {
+                    const isAvailable = staff.availability && staff.availability.includes(dateStr);
+                    let availInfo = '';
+                    let availShiftNames = [];
+                    let canAllDay = false;
+                    let customTime = '';
                     
-                    html += `<button class="shift-toggle-btn ${btnClass}" 
-                        style="${style}"
-                        data-shift-id="${shift.id}" data-staff="${staff.name}" data-is-leave="true"
-                        title="${shift.leaveType}"
-                        onclick="toggleShiftBtn(this,'${shift.color}')">${leaveIcon}${shift.name}</button>`;
-                });
-            }
-            
-            const overtimeStart = staffSched ? (staffSched.overtimeStart || '') : '';
-            const overtimeEnd = staffSched ? (staffSched.overtimeEnd || '') : '';
-            const leaveHours = staffSched ? (staffSched.leaveHours || 8) : 8;
-            const note = staffSched ? (staffSched.note || '') : '';
-            const isLeaveSelected = staffSched && shifts.find(s => s.id === staffSched.shiftId)?.isLeave;
-            
-            html += `</div>
-                <div class="controls">
-                    <input type="text" class="note-input" data-staff="${staff.name}" value="${note}" placeholder="備註" style="width:50px;">
+                    if (isAvailable) {
+                        const match = staff.availability.match(new RegExp(dateStr + '\\(([^)]+)\\)'));
+                        availInfo = match ? match[1] : '整天';
+                        canAllDay = availInfo === '整天';
+                        
+                        if (availInfo.includes(':') && availInfo.includes('-')) {
+                            customTime = availInfo;
+                        } else {
+                            availShiftNames = canAllDay ? shifts.map(s => s.name) : availInfo.split('+');
+                        }
+                    }
                     
-                    <!-- 🆕 自訂時段選擇器 -->
-                    <div class="custom-time-control" data-staff="${staff.name}" style="display:${isCustomScheduled ? 'flex' : 'none'};align-items:center;gap:4px;background:#f3f4f6;padding:4px 8px;border-radius:6px;">
+                    const staffSched = daySchedule.find(s => s.staffName === staff.name);
+                    
+                    const isCustomScheduled = staffSched && staffSched.shiftId.startsWith('custom_');
+                    let customStartTime = '';
+                    let customEndTime = '';
+                    
+                    if (isCustomScheduled) {
+                        const timeMatch = staffSched.shiftName.match(/(\d{2}:\d{2})-(\d{2}:\d{2})/);
+                        if (timeMatch) {
+                            customStartTime = timeMatch[1];
+                            customEndTime = timeMatch[2];
+                        }
+                    } else if (customTime) {
+                        const timeParts = customTime.split('-');
+                        if (timeParts.length === 2) {
+                            customStartTime = timeParts[0].trim();
+                            customEndTime = timeParts[1].trim();
+                        }
+                    }
+                    
+                    const rowClass = isAvailable ? 'staff-shift-row can-work' : 'staff-shift-row';
+                    
+                    html += `<div class="${rowClass}" data-staff="${staff.name}">
+                        <div class="staff-info">
+                            <span class="staff-name">${staff.name}</span>
+                            <span class="staff-status ${isAvailable ? 'available' : 'unavailable'}">${isAvailable ? '✓可' : '✗'}</span>
+                        </div>
+                        <div class="shift-buttons">
+                            <button class="shift-toggle-btn no-schedule ${!staffSched ? 'selected' : ''}" 
+                                data-shift-id="" data-staff="${staff.name}" data-is-leave="false"
+                                onclick="toggleShiftBtn(this, '#9ca3af')">不排</button>`;
+                    
+                    // 一般班別按鈕
+                    shifts.filter(s => !s.isLeave).forEach(shift => {
+                        const isSelected = staffSched && staffSched.shiftId === shift.id;
+                        const btnClass = isSelected ? 'selected' : '';
+                        const style = `border-color:${shift.color};${isSelected ? 'background:' + shift.color : ''}`;
+                        
+                        html += `<button class="shift-toggle-btn ${btnClass}" 
+                            style="${style}"
+                            data-shift-id="${shift.id}" data-staff="${staff.name}" data-is-leave="false"
+                            title="${shift.time}"
+                            onclick="toggleShiftBtn(this,'${shift.color}')">${shift.name}</button>`;
+                    });
+                    
+                    // 自訂按鈕
+                    const customBtnClass = isCustomScheduled ? 'selected' : '';
+                    const customBtnStyle = isCustomScheduled ? 'border-color:#a78bfa;background:#a78bfa' : 'border-color:#a78bfa';
+                    html += `<button class="shift-toggle-btn custom-shift-btn ${customBtnClass}" 
+                        style="${customBtnStyle}"
+                        data-shift-id="custom" data-staff="${staff.name}" data-is-leave="false"
+                        onclick="toggleCustomShift(this, '${staff.name}', '#a78bfa')">⚙️ 自訂</button>`;
+                    
+                    // ✨ 自訂時間選擇器 - 直接放在自訂按鈕旁邊
+                    html += `<div class="custom-time-control" data-staff="${staff.name}" style="display:${isCustomScheduled ? 'flex' : 'none'};align-items:center;gap:4px;background:#f3f4f6;padding:4px 8px;border-radius:6px;">
                         <select class="custom-start-time" data-staff="${staff.name}" style="width:65px;font-size:11px;padding:3px;" onchange="updateCustomTimeDisplay('${staff.name}')">
                             ${generateTimeOptions(customStartTime)}
                         </select>
@@ -1609,205 +1602,234 @@
                         <span class="custom-hours-display" data-staff="${staff.name}" style="font-size:11px;color:#10b981;font-weight:600;margin-left:4px;white-space:nowrap;">
                             ${customStartTime && customEndTime ? calculateAndFormatCustomHours(customStartTime, customEndTime) : ''}
                         </span>
-                    </div>
+                    </div>`;
                     
-                    <!-- 加班時間選擇器 -->
-                    <div class="overtime-control" style="display:${isLeaveSelected || isCustomScheduled ? 'none' : 'flex'};align-items:center;gap:2px;">
-                        <select class="overtime-start" data-staff="${staff.name}" style="width:65px;font-size:11px;padding:2px;">
-                            <option value="">無加班</option>
-                            ${generateTimeOptions(overtimeStart)}
-                        </select>
-                        <span style="font-size:10px;">至</span>
-                        <select class="overtime-end" data-staff="${staff.name}" style="width:65px;font-size:11px;padding:2px;">
-                            <option value="">--</option>
-                            ${generateTimeOptions(overtimeEnd)}
-                        </select>
-                    </div>
-                    
-                    <!-- 請假時數 -->
-                    <div class="leave-control" style="display:${isLeaveSelected ? 'flex' : 'none'};align-items:center;gap:2px;">
-                        <input type="number" class="leave-hours-input" data-staff="${staff.name}" value="${leaveHours}" min="1" max="8" step="0.5" style="width:40px;">
-                        <span style="font-size:10px;color:#666;">h假</span>
-                    </div>
-                </div>`;
-            
-            if (isAvailable) {
-                html += `<div class="avail-shifts-info">可：${availInfo}</div>`;
-            }
-            
-            html += `</div>`;
-        });
-        grid.innerHTML = html;
-    }
-    document.getElementById('scheduleModal').classList.add('show');
-}
-
-// 🆕 計算自訂時段的工時並格式化顯示
-function calculateAndFormatCustomHours(startTime, endTime) {
-    if (!startTime || !endTime) return '';
-    const timeStr = `${startTime}-${endTime}`;
-    const workInfo = calculateWorkHours(timeStr);
-    
-    let display = `${workInfo.netHours.toFixed(1)}h`;
-    if (workInfo.breakMinutes > 0) {
-        display += ` (含休${workInfo.breakMinutes}分)`;
-    }
-    return display;
-}
-
-// 🆕 更新自訂時段的工時顯示
-function updateCustomTimeDisplay(staffName) {
-    const row = document.querySelector(`.staff-shift-row[data-staff="${staffName}"]`);
-    if (!row) return;
-    
-    const startSelect = row.querySelector('.custom-start-time');
-    const endSelect = row.querySelector('.custom-end-time');
-    const hoursDisplay = row.querySelector('.custom-hours-display');
-    
-    if (startSelect && endSelect && hoursDisplay) {
-        const startTime = startSelect.value;
-        const endTime = endSelect.value;
-        hoursDisplay.textContent = calculateAndFormatCustomHours(startTime, endTime);
-    }
-}
-
-// 🆕 切換自訂班別
-function toggleCustomShift(btn, staffName, color) {
-    const row = btn.closest('.staff-shift-row');
-    
-    // 取消其他按鈕的選取
-    row.querySelectorAll('.shift-toggle-btn').forEach(b => { 
-        b.classList.remove('selected'); 
-        if (b.classList.contains('no-schedule')) {
-            b.style.background = 'white';
-        } else {
-            b.style.background = 'white'; 
-        }
-    });
-    
-    // 選取自訂按鈕
-    btn.classList.add('selected');
-    btn.style.background = color;
-    
-    // 顯示/隱藏相關控制項
-    const customTimeControl = row.querySelector('.custom-time-control');
-    const overtimeControl = row.querySelector('.overtime-control');
-    const leaveControl = row.querySelector('.leave-control');
-    
-    if (customTimeControl) customTimeControl.style.display = 'flex';
-    if (overtimeControl) overtimeControl.style.display = 'none';
-    if (leaveControl) leaveControl.style.display = 'none';
-    
-    // 如果時間還沒設定，使用預設值
-    const startSelect = row.querySelector('.custom-start-time');
-    const endSelect = row.querySelector('.custom-end-time');
-    if (startSelect && endSelect) {
-        if (!startSelect.value) startSelect.value = '09:00';
-        if (!endSelect.value) endSelect.value = '18:00';
-        updateCustomTimeDisplay(staffName);
-    }
-}
-        
-        function toggleShiftBtn(btn, color) {
-    const row = btn.closest('.staff-shift-row');
-    row.querySelectorAll('.shift-toggle-btn').forEach(b => { 
-        b.classList.remove('selected'); 
-        if (b.classList.contains('no-schedule')) {
-            b.style.background = 'white';
-        } else {
-            b.style.background = 'white'; 
-        }
-    });
-    btn.classList.add('selected');
-    btn.style.background = color;
-    
-    const isLeave = btn.dataset.isLeave === 'true';
-    const overtimeControl = row.querySelector('.overtime-control');
-    const leaveControl = row.querySelector('.leave-control');
-    const customTimeControl = row.querySelector('.custom-time-control');  // 🆕
-    
-    if (overtimeControl && leaveControl) {
-        overtimeControl.style.display = isLeave ? 'none' : 'flex';
-        leaveControl.style.display = isLeave ? 'flex' : 'none';
-        if (customTimeControl) customTimeControl.style.display = 'none';  // 🆕 隱藏自訂控制項
-    }
-}
-
-        function confirmSchedule() {
-    const rows = document.querySelectorAll('#staffShiftGrid .staff-shift-row');
-    const daySchedule = [];
-    
-    rows.forEach(row => {
-        const staffName = row.dataset.staff;
-        const selectedBtn = row.querySelector('.shift-toggle-btn.selected');
-        const noteInput = row.querySelector('.note-input');
-        const note = noteInput ? noteInput.value.trim() : '';
-        
-        if (selectedBtn && selectedBtn.dataset.shiftId) {
-            const shiftId = selectedBtn.dataset.shiftId;
-            
-            // 🆕 處理自訂班別
-            if (shiftId === 'custom') {
-                const startSelect = row.querySelector('.custom-start-time');
-                const endSelect = row.querySelector('.custom-end-time');
-                
-                if (startSelect && endSelect) {
-                    const startTime = startSelect.value;
-                    const endTime = endSelect.value;
-                    
-                    if (startTime && endTime) {
-                        const customShiftId = 'custom_' + currentEditingDate + '_' + staffName;
-                        const customShiftName = `自訂 ${startTime}-${endTime}`;
-                        
-                        daySchedule.push({
-                            staffName,
-                            shiftId: customShiftId,
-                            shiftName: customShiftName,
-                            note
+                    // 假別按鈕
+                    const leaveShifts = shifts.filter(s => s.isLeave);
+                    if (leaveShifts.length > 0) {
+                        html += `<span style="margin-left:5px;color:#ddd;">|</span>`;
+                        leaveShifts.forEach(shift => {
+                            const isSelected = staffSched && staffSched.shiftId === shift.id;
+                            const btnClass = isSelected ? 'selected' : '';
+                            const style = `border-color:${shift.color};${isSelected ? 'background:' + shift.color : ''}`;
+                            const leaveIcon = shift.leaveType === '病假' ? '🏥' : shift.leaveType === '事假' ? '📝' : shift.leaveType === '特休' ? '🌴' : '🎉';
+                            
+                            html += `<button class="shift-toggle-btn ${btnClass}" 
+                                style="${style}"
+                                data-shift-id="${shift.id}" data-staff="${staff.name}" data-is-leave="true"
+                                title="${shift.leaveType}"
+                                onclick="toggleShiftBtn(this,'${shift.color}')">${leaveIcon}${shift.name}</button>`;
                         });
                     }
-                }
-            } 
-            // 處理一般班別和假別
-            else {
-                const isLeave = selectedBtn.dataset.isLeave === 'true';
-                const shift = shifts.find(s => s.id === shiftId);
-                
-                const scheduleItem = { 
-                    staffName, 
-                    shiftId, 
-                    shiftName: shift ? shift.name : shiftId,
-                    note 
-                };
-                
-                if (isLeave) {
-                    const leaveHoursInput = row.querySelector('.leave-hours-input');
-                    const leaveHours = leaveHoursInput ? parseFloat(leaveHoursInput.value) || 8 : 8;
-                    scheduleItem.leaveHours = leaveHours;
-                } else {
-                    const overtimeStartSelect = row.querySelector('.overtime-start');
-                    const overtimeEndSelect = row.querySelector('.overtime-end');
-                    const overtimeStart = overtimeStartSelect ? overtimeStartSelect.value : '';
-                    const overtimeEnd = overtimeEndSelect ? overtimeEndSelect.value : '';
                     
-                    if (overtimeStart && overtimeEnd) {
-                        scheduleItem.overtimeStart = overtimeStart;
-                        scheduleItem.overtimeEnd = overtimeEnd;
-                        scheduleItem.overtimeStatus = '已審核';
+                    html += `</div>`;
+                    
+                    const overtimeStart = staffSched ? (staffSched.overtimeStart || '') : '';
+                    const overtimeEnd = staffSched ? (staffSched.overtimeEnd || '') : '';
+                    const leaveHours = staffSched ? (staffSched.leaveHours || 8) : 8;
+                    const note = staffSched ? (staffSched.note || '') : '';
+                    const isLeaveSelected = staffSched && shifts.find(s => s.id === staffSched.shiftId)?.isLeave;
+                    
+                    html += `<div class="controls">
+                        <input type="text" class="note-input" data-staff="${staff.name}" value="${note}" placeholder="備註" style="width:50px;">
+                        
+                        <!-- 加班時間選擇器 -->
+                        <div class="overtime-control" style="display:${isLeaveSelected || isCustomScheduled ? 'none' : 'flex'};align-items:center;gap:2px;">
+                            <select class="overtime-start" data-staff="${staff.name}" style="width:65px;font-size:11px;padding:2px;">
+                                <option value="">無加班</option>
+                                ${generateTimeOptions(overtimeStart)}
+                            </select>
+                            <span style="font-size:10px;">至</span>
+                            <select class="overtime-end" data-staff="${staff.name}" style="width:65px;font-size:11px;padding:2px;">
+                                <option value="">--</option>
+                                ${generateTimeOptions(overtimeEnd)}
+                            </select>
+                        </div>
+                        
+                        <!-- 請假時數 -->
+                        <div class="leave-control" style="display:${isLeaveSelected ? 'flex' : 'none'};align-items:center;gap:2px;">
+                            <input type="number" class="leave-hours-input" data-staff="${staff.name}" value="${leaveHours}" min="1" max="8" step="0.5" style="width:40px;">
+                            <span style="font-size:10px;color:#666;">h假</span>
+                        </div>
+                    </div>`;
+                    
+                    if (isAvailable) {
+                        html += `<div class="avail-shifts-info">可：${availInfo}</div>`;
                     }
-                }
-                
-                daySchedule.push(scheduleItem);
+                    
+                    html += `</div>`;
+                });
+                grid.innerHTML = html;
+            }
+            document.getElementById('scheduleModal').classList.add('show');
+        }
+
+        // 🆕 計算自訂時段的工時並格式化顯示
+        function calculateAndFormatCustomHours(startTime, endTime) {
+            if (!startTime || !endTime) return '';
+            const timeStr = `${startTime}-${endTime}`;
+            const workInfo = calculateWorkHours(timeStr);
+            
+            let display = `${workInfo.netHours.toFixed(1)}h`;
+            if (workInfo.breakMinutes > 0) {
+                display += ` (含休${workInfo.breakMinutes}分)`;
+            }
+            return display;
+        }
+
+        // 🆕 更新自訂時段的工時顯示
+        function updateCustomTimeDisplay(staffName) {
+            const row = document.querySelector(`.staff-shift-row[data-staff="${staffName}"]`);
+            if (!row) return;
+            
+            const startSelect = row.querySelector('.custom-start-time');
+            const endSelect = row.querySelector('.custom-end-time');
+            const hoursDisplay = row.querySelector('.custom-hours-display');
+            
+            if (startSelect && endSelect && hoursDisplay) {
+                const startTime = startSelect.value;
+                const endTime = endSelect.value;
+                hoursDisplay.textContent = calculateAndFormatCustomHours(startTime, endTime);
             }
         }
-    });
-    
-    schedule[currentEditingDate] = daySchedule;
-    saveLocalSchedule();
-    closeModal('scheduleModal');
-    generateCalendar();
-    showToast('✅ 已更新排班');
-}
+
+        // 🆕 切換自訂班別
+        function toggleCustomShift(btn, staffName, color) {
+            const row = btn.closest('.staff-shift-row');
+            
+            // 取消其他按鈕的選取
+            row.querySelectorAll('.shift-toggle-btn').forEach(b => { 
+                b.classList.remove('selected'); 
+                if (b.classList.contains('no-schedule')) {
+                    b.style.background = 'white';
+                } else {
+                    b.style.background = 'white'; 
+                }
+            });
+            
+            // 選取自訂按鈕
+            btn.classList.add('selected');
+            btn.style.background = color;
+            
+            // 顯示/隱藏相關控制項
+            const customTimeControl = row.querySelector('.custom-time-control');
+            const overtimeControl = row.querySelector('.overtime-control');
+            const leaveControl = row.querySelector('.leave-control');
+            
+            if (customTimeControl) customTimeControl.style.display = 'flex';
+            if (overtimeControl) overtimeControl.style.display = 'none';
+            if (leaveControl) leaveControl.style.display = 'none';
+            
+            // 如果時間還沒設定，使用預設值
+            const startSelect = row.querySelector('.custom-start-time');
+            const endSelect = row.querySelector('.custom-end-time');
+            if (startSelect && endSelect) {
+                if (!startSelect.value) startSelect.value = '09:00';
+                if (!endSelect.value) endSelect.value = '18:00';
+                updateCustomTimeDisplay(staffName);
+            }
+        }
+        
+        function toggleShiftBtn(btn, color) {
+            const row = btn.closest('.staff-shift-row');
+            row.querySelectorAll('.shift-toggle-btn').forEach(b => { 
+                b.classList.remove('selected'); 
+                if (b.classList.contains('no-schedule')) {
+                    b.style.background = 'white';
+                } else {
+                    b.style.background = 'white'; 
+                }
+            });
+            btn.classList.add('selected');
+            btn.style.background = color;
+            
+            const isLeave = btn.dataset.isLeave === 'true';
+            const overtimeControl = row.querySelector('.overtime-control');
+            const leaveControl = row.querySelector('.leave-control');
+            const customTimeControl = row.querySelector('.custom-time-control');
+            
+            if (overtimeControl && leaveControl) {
+                overtimeControl.style.display = isLeave ? 'none' : 'flex';
+                leaveControl.style.display = isLeave ? 'flex' : 'none';
+                if (customTimeControl) customTimeControl.style.display = 'none';
+            }
+        }
+
+        function confirmSchedule() {
+            const rows = document.querySelectorAll('#staffShiftGrid .staff-shift-row');
+            const daySchedule = [];
+            
+            rows.forEach(row => {
+                const staffName = row.dataset.staff;
+                const selectedBtn = row.querySelector('.shift-toggle-btn.selected');
+                const noteInput = row.querySelector('.note-input');
+                const note = noteInput ? noteInput.value.trim() : '';
+                
+                if (selectedBtn && selectedBtn.dataset.shiftId) {
+                    const shiftId = selectedBtn.dataset.shiftId;
+                    
+                    // 🆕 處理自訂班別
+                    if (shiftId === 'custom') {
+                        const startSelect = row.querySelector('.custom-start-time');
+                        const endSelect = row.querySelector('.custom-end-time');
+                        
+                        if (startSelect && endSelect) {
+                            const startTime = startSelect.value;
+                            const endTime = endSelect.value;
+                            
+                            if (startTime && endTime) {
+                                const customShiftId = 'custom_' + currentEditingDate + '_' + staffName;
+                                const customShiftName = `自訂 ${startTime}-${endTime}`;
+                                
+                                daySchedule.push({
+                                    staffName,
+                                    shiftId: customShiftId,
+                                    shiftName: customShiftName,
+                                    note
+                                });
+                            }
+                        }
+                    } 
+                    // 處理一般班別和假別
+                    else {
+                        const isLeave = selectedBtn.dataset.isLeave === 'true';
+                        const shift = shifts.find(s => s.id === shiftId);
+                        
+                        const scheduleItem = { 
+                            staffName, 
+                            shiftId, 
+                            shiftName: shift ? shift.name : shiftId,
+                            note 
+                        };
+                        
+                        if (isLeave) {
+                            const leaveHoursInput = row.querySelector('.leave-hours-input');
+                            const leaveHours = leaveHoursInput ? parseFloat(leaveHoursInput.value) || 8 : 8;
+                            scheduleItem.leaveHours = leaveHours;
+                        } else {
+                            const overtimeStartSelect = row.querySelector('.overtime-start');
+                            const overtimeEndSelect = row.querySelector('.overtime-end');
+                            const overtimeStart = overtimeStartSelect ? overtimeStartSelect.value : '';
+                            const overtimeEnd = overtimeEndSelect ? overtimeEndSelect.value : '';
+                            
+                            if (overtimeStart && overtimeEnd) {
+                                scheduleItem.overtimeStart = overtimeStart;
+                                scheduleItem.overtimeEnd = overtimeEnd;
+                                scheduleItem.overtimeStatus = '已審核';
+                            }
+                        }
+                        
+                        daySchedule.push(scheduleItem);
+                    }
+                }
+            });
+            
+            schedule[currentEditingDate] = daySchedule;
+            saveLocalSchedule();
+            closeModal('scheduleModal');
+            generateCalendar();
+            showToast('✅ 已更新排班');
+        }
 
         function saveLocalSchedule() { localStorage.setItem('schedule', JSON.stringify(schedule)); }
         function loadLocalSchedule() { 
