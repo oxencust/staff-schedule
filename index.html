@@ -97,8 +97,8 @@
         .day-number { font-weight: 700; font-size: 14px; margin-bottom: 6px; }
         .holiday-name { font-size: 10px; color: #b45309; margin-bottom: 4px; }
         
-        .staff-availability-list { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; max-height: 40px; overflow-y: auto; }
-        .staff-avail-item { font-size: 9px; padding: 2px 6px; border-radius: 3px; background: var(--green-light); color: var(--green-dark); display: flex; align-items: center; gap: 4px; }
+        .staff-availability-list { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; max-height: 50px; overflow-y: auto; }
+        .staff-avail-item { font-size: 9px; padding: 3px 6px; border-radius: 3px; background: linear-gradient(135deg, var(--green-light), #d4f4dd); color: var(--green-dark); display: flex; align-items: center; gap: 4px; border: 1px solid var(--green); font-weight: 600; }
         .shift-dot { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
 
         .schedule-list { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; }
@@ -1923,7 +1923,10 @@
         async function saveToSheet() {
             if (!API_URL) { showToast('請先設定 API'); return; }
             
-            showToast('💾 儲存中...');
+            // 顯示持續的載入提示
+            const loadingToast = document.getElementById('toast');
+            loadingToast.innerHTML = '<div style="display:flex;align-items:center;gap:10px;"><div class="spinner" style="margin:0;width:20px;height:20px;border-width:2px;"></div><span>💾 儲存中，請稍候...</span></div>';
+            loadingToast.classList.add('show');
             
             try {
                 const monthStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
@@ -1941,12 +1944,22 @@
                 });
                 const data = await res.json();
                 
+                // 移除載入動畫，顯示結果
+                loadingToast.classList.remove('show');
+                
                 if (data.success) {
-                    let msg = '✅ 已儲存';
+                    let msg = '✅ 儲存完成';
                     if (data.webhookSent) {
-                        msg += '，已同步';
-                    } else if (data.webhookError) {
+                        msg += '，已同步至 MySQL';
+                    }
+                    if (data.calendarSynced) {
+                        msg += '，已同步至日曆';
+                    }
+                    if (data.webhookError) {
                         msg += '（' + data.webhookError + '）';
+                    }
+                    if (data.calendarError) {
+                        msg += '（日曆：' + data.calendarError + '）';
                     }
                     showToast(msg);
                     console.log('儲存結果:', data);
@@ -1954,6 +1967,8 @@
                     showToast('❌ 儲存失敗：' + (data.error || ''));
                 }
             } catch (e) {
+                // 移除載入動畫
+                loadingToast.classList.remove('show');
                 console.error('儲存錯誤:', e);
                 showToast('❌ 儲存失敗：' + e.message);
             }
