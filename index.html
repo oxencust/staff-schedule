@@ -1582,16 +1582,17 @@
                             onclick="toggleShiftBtn(this,'${shift.color}')">${shift.name}</button>`;
                     });
                     
-                    // 自訂按鈕
-                    const customBtnClass = isCustomScheduled ? 'selected' : '';
-                    const customBtnStyle = isCustomScheduled ? 'border-color:#a78bfa;background:#a78bfa' : 'border-color:#a78bfa';
-                    html += `<button class="shift-toggle-btn custom-shift-btn ${customBtnClass}" 
-                        style="${customBtnStyle}"
-                        data-shift-id="custom" data-staff="${staff.name}" data-is-leave="false"
-                        onclick="toggleCustomShift(this, '${staff.name}', '#a78bfa')">⚙️ 自訂</button>`;
-                    
-                    // ✨ 自訂時間選擇器 - 直接放在自訂按鈕旁邊
-                    html += `<div class="custom-time-control" data-staff="${staff.name}" style="display:${isCustomScheduled ? 'flex' : 'none'};align-items:center;gap:4px;background:#f3f4f6;padding:4px 8px;border-radius:6px;">
+                    // ✨ 判斷是否應該預選自訂（已排自訂班別 或 員工填了自訂時段）
+const shouldShowCustom = isCustomScheduled || (customTime && !staffSched);
+const customBtnClass = shouldShowCustom ? 'selected' : '';
+const customBtnStyle = shouldShowCustom ? 'border-color:#a78bfa;background:#a78bfa' : 'border-color:#a78bfa';
+html += `<button class="shift-toggle-btn custom-shift-btn ${customBtnClass}" 
+    style="${customBtnStyle}"
+    data-shift-id="custom" data-staff="${staff.name}" data-is-leave="false"
+    onclick="toggleCustomShift(this, '${staff.name}', '#a78bfa')">⚙️ 自訂</button>`;
+
+// ✨ 自訂時間選擇器 - 當應該顯示自訂時就顯示
+html += `<div class="custom-time-control" data-staff="${staff.name}" style="display:${shouldShowCustom ? 'flex' : 'none'};align-items:center;gap:4px;background:#f3f4f6;padding:4px 8px;border-radius:6px;">
                         <select class="custom-start-time" data-staff="${staff.name}" style="width:65px;font-size:11px;padding:3px;" onchange="updateCustomTimeDisplay('${staff.name}')">
                             ${generateTimeOptions(customStartTime)}
                         </select>
