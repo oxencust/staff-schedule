@@ -1540,50 +1540,52 @@
                     const staffSched = daySchedule.find(s => s.staffName === staff.name);
                     
                     const isCustomScheduled = staffSched && staffSched.shiftId.startsWith('custom_');
-                    let customStartTime = '';
-                    let customEndTime = '';
-                    
-                    if (isCustomScheduled) {
-                        const timeMatch = staffSched.shiftName.match(/(\d{2}:\d{2})-(\d{2}:\d{2})/);
-                        if (timeMatch) {
-                            customStartTime = timeMatch[1];
-                            customEndTime = timeMatch[2];
-                        }
-                    } else if (customTime) {
-                        const timeParts = customTime.split('-');
-                        if (timeParts.length === 2) {
-                            customStartTime = timeParts[0].trim();
-                            customEndTime = timeParts[1].trim();
-                        }
-                    }
-                    
-                    const rowClass = isAvailable ? 'staff-shift-row can-work' : 'staff-shift-row';
-                    
-                    html += `<div class="${rowClass}" data-staff="${staff.name}">
-                        <div class="staff-info">
-                            <span class="staff-name">${staff.name}</span>
-                            <span class="staff-status ${isAvailable ? 'available' : 'unavailable'}">${isAvailable ? '✓可' : '✗'}</span>
-                        </div>
-                        <div class="shift-buttons">
-                            <button class="shift-toggle-btn no-schedule ${!staffSched && !shouldShowCustom ? 'selected' : ''}" 
-                                data-shift-id="" data-staff="${staff.name}" data-is-leave="false"
-                                onclick="toggleShiftBtn(this, '#9ca3af')">不排</button>`;
-                    
-                    // 一般班別按鈕
-                    shifts.filter(s => !s.isLeave).forEach(shift => {
-                        const isSelected = staffSched && staffSched.shiftId === shift.id;
-                        const btnClass = isSelected ? 'selected' : '';
-                        const style = `border-color:${shift.color};${isSelected ? 'background:' + shift.color : ''}`;
-                        
-                        html += `<button class="shift-toggle-btn ${btnClass}" 
-                            style="${style}"
-                            data-shift-id="${shift.id}" data-staff="${staff.name}" data-is-leave="false"
-                            title="${shift.time}"
-                            onclick="toggleShiftBtn(this,'${shift.color}')">${shift.name}</button>`;
-                    });
-                    
-                    // ✨ 判斷是否應該預選自訂（已排自訂班別 或 員工填了自訂時段）
+let customStartTime = '';
+let customEndTime = '';
+
+if (isCustomScheduled) {
+    const timeMatch = staffSched.shiftName.match(/(\d{2}:\d{2})-(\d{2}:\d{2})/);
+    if (timeMatch) {
+        customStartTime = timeMatch[1];
+        customEndTime = timeMatch[2];
+    }
+} else if (customTime) {
+    const timeParts = customTime.split('-');
+    if (timeParts.length === 2) {
+        customStartTime = timeParts[0].trim();
+        customEndTime = timeParts[1].trim();
+    }
+}
+
+// ✨ 在這裡定義（在生成按鈕之前）
 const shouldShowCustom = isCustomScheduled || (customTime && !staffSched);
+
+const rowClass = isAvailable ? 'staff-shift-row can-work' : 'staff-shift-row';
+
+html += `<div class="${rowClass}" data-staff="${staff.name}">
+    <div class="staff-info">
+        <span class="staff-name">${staff.name}</span>
+        <span class="staff-status ${isAvailable ? 'available' : 'unavailable'}">${isAvailable ? '✓可' : '✗'}</span>
+    </div>
+    <div class="shift-buttons">
+        <button class="shift-toggle-btn no-schedule ${!staffSched && !shouldShowCustom ? 'selected' : ''}" 
+            data-shift-id="" data-staff="${staff.name}" data-is-leave="false"
+            onclick="toggleShiftBtn(this, '#9ca3af')">不排</button>`;
+
+// 一般班別按鈕
+shifts.filter(s => !s.isLeave).forEach(shift => {
+    const isSelected = staffSched && staffSched.shiftId === shift.id;
+    const btnClass = isSelected ? 'selected' : '';
+    const style = `border-color:${shift.color};${isSelected ? 'background:' + shift.color : ''}`;
+    
+    html += `<button class="shift-toggle-btn ${btnClass}" 
+        style="${style}"
+        data-shift-id="${shift.id}" data-staff="${staff.name}" data-is-leave="false"
+        title="${shift.time}"
+        onclick="toggleShiftBtn(this,'${shift.color}')">${shift.name}</button>`;
+});
+
+// 自訂按鈕
 const customBtnClass = shouldShowCustom ? 'selected' : '';
 const customBtnStyle = shouldShowCustom ? 'border-color:#a78bfa;background:#a78bfa' : 'border-color:#a78bfa';
 html += `<button class="shift-toggle-btn custom-shift-btn ${customBtnClass}" 
@@ -1591,19 +1593,19 @@ html += `<button class="shift-toggle-btn custom-shift-btn ${customBtnClass}"
     data-shift-id="custom" data-staff="${staff.name}" data-is-leave="false"
     onclick="toggleCustomShift(this, '${staff.name}', '#a78bfa')">⚙️ 自訂</button>`;
 
-// ✨ 自訂時間選擇器 - 當應該顯示自訂時就顯示
+// ✨ 自訂時間選擇器 - 完整版
 html += `<div class="custom-time-control" data-staff="${staff.name}" style="display:${shouldShowCustom ? 'flex' : 'none'};align-items:center;gap:4px;background:#f3f4f6;padding:4px 8px;border-radius:6px;">
-                        <select class="custom-start-time" data-staff="${staff.name}" style="width:65px;font-size:11px;padding:3px;" onchange="updateCustomTimeDisplay('${staff.name}')">
-                            ${generateTimeOptions(customStartTime)}
-                        </select>
-                        <span style="font-size:10px;">-</span>
-                        <select class="custom-end-time" data-staff="${staff.name}" style="width:65px;font-size:11px;padding:3px;" onchange="updateCustomTimeDisplay('${staff.name}')">
-                            ${generateTimeOptions(customEndTime)}
-                        </select>
-                        <span class="custom-hours-display" data-staff="${staff.name}" style="font-size:11px;color:#10b981;font-weight:600;margin-left:4px;white-space:nowrap;">
-                            ${customStartTime && customEndTime ? calculateAndFormatCustomHours(customStartTime, customEndTime) : ''}
-                        </span>
-                    </div>`;
+    <select class="custom-start-time" data-staff="${staff.name}" style="width:65px;font-size:11px;padding:3px;" onchange="updateCustomTimeDisplay('${staff.name}')">
+        ${generateTimeOptions(customStartTime)}
+    </select>
+    <span style="font-size:10px;">-</span>
+    <select class="custom-end-time" data-staff="${staff.name}" style="width:65px;font-size:11px;padding:3px;" onchange="updateCustomTimeDisplay('${staff.name}')">
+        ${generateTimeOptions(customEndTime)}
+    </select>
+    <span class="custom-hours-display" data-staff="${staff.name}" style="font-size:11px;color:#10b981;font-weight:600;margin-left:4px;white-space:nowrap;">
+        ${customStartTime && customEndTime ? calculateAndFormatCustomHours(customStartTime, customEndTime) : ''}
+    </span>
+</div>`;
                     
                     // 假別按鈕
                     const leaveShifts = shifts.filter(s => s.isLeave);
