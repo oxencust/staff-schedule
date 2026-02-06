@@ -1630,16 +1630,29 @@
             fragment.appendChild(customDiv);
             
             // 自訂時間輸入
-            const customInputDiv = document.createElement('div');
-            customInputDiv.className = 'custom-shift-inputs';
-            customInputDiv.id = 'customShiftInputs';
-            customInputDiv.innerHTML = `
-                <div class="custom-time-row">
-                    <input type="time" class="custom-time-input" id="customStartTime" value="12:00">
-                    <span class="custom-time-separator">～</span>
-                    <input type="time" class="custom-time-input" id="customEndTime" value="18:00">
-                </div>
-            `;
+const customInputDiv = document.createElement('div');
+customInputDiv.className = 'custom-shift-inputs';
+customInputDiv.id = 'customShiftInputs';
+
+// 生成時間選項（只有整點和30分）
+let timeOptions = '<option value="">請選擇</option>';
+for (let h = 0; h <= 23; h++) {
+    const hour = String(h).padStart(2, '0');
+    timeOptions += `<option value="${hour}:00">${hour}:00</option>`;
+    timeOptions += `<option value="${hour}:30">${hour}:30</option>`;
+}
+
+customInputDiv.innerHTML = `
+    <div class="custom-time-row">
+        <select class="custom-time-input" id="customStartTime" style="padding: 10px 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; text-align: center;">
+            ${timeOptions}
+        </select>
+        <span class="custom-time-separator">～</span>
+        <select class="custom-time-input" id="customEndTime" style="padding: 10px 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; text-align: center;">
+            ${timeOptions}
+        </select>
+    </div>
+`;
             fragment.appendChild(customInputDiv);
             
             // ⚡ 一次性插入
