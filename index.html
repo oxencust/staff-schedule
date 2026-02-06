@@ -1728,7 +1728,7 @@
                         data-shift-id="custom" data-staff="${staff.name}" data-is-leave="false"
                         onclick="toggleCustomShift(this, '${staff.name}', '#a78bfa')">⚙️ 自訂</button>
                         
-                        <span style="display:inline-flex;align-items:center;gap:3px;margin-left:4px;">
+                        <span style="display:inline-flex;align-items:center;gap:3px;margin-left:4px;min-width:160px;">
                             <select class="custom-start-time" data-staff="${staff.name}" style="width:60px;font-size:11px;padding:2px;border:1px solid #d1d5db;border-radius:4px;" onchange="updateCustomTimeDisplay('${staff.name}')">
                                 <option value="">--</option>
                                 ${generateTimeOptions(customStartTime)}
