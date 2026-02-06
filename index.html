@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>衡點-排班管理系統 v6</title>
+    <title>衡點-排班管理系統</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&display=swap');
         
@@ -378,7 +378,7 @@
 </head>
 <body>
     <nav class="navbar">
-        <h1>📋 衡點-排班管理系統 v6</h1>
+        <h1>📋 衡點-排班管理系統</h1>
         <span class="api-status" id="apiStatus">未連線</span>
     </nav>
 
@@ -1624,6 +1624,13 @@
             return Math.round(diffMinutes / 30) / 2;
         }
 
+        // ✨ 時間格式標準化函數（補零）
+        function normalizeTime(timeStr) {
+            if (!timeStr) return '';
+            const [hour, minute] = timeStr.split(':');
+            return `${hour.padStart(2, '0')}:${minute.padStart(2, '0')}`;
+        }
+        
         function openScheduleModal(dateStr) {
             currentEditingDate = dateStr;
             const date = new Date(dateStr);
@@ -1649,10 +1656,17 @@
                         availInfo = match ? match[1] : '整天';
                         canAllDay = availInfo === '整天';
                         
-                        // 🆕 檢查是否為自訂時間格式（HH:MM-HH:MM）
+                        // ✨ 改進版：使用正則表達式提取時間格式
                         if (availInfo.includes(':') && availInfo.includes('-')) {
-                            customTime = availInfo;
-                        } else {
+                            // 提取 HH:MM-HH:MM 或 H:MM-H:MM 格式
+                            const timeMatch = availInfo.match(/(\d{1,2}:\d{2})-(\d{1,2}:\d{2})/);
+                            if (timeMatch) {
+                                customTime = timeMatch[0];  // 完整的時間字串 "14:00-20:00"
+                            }
+                        }
+                        
+                        // 如果不是自訂時間，解析班別名稱
+                        if (!customTime) {
                             availShiftNames = canAllDay ? shifts.map(s => s.name) : availInfo.split('+');
                         }
                     }
@@ -1666,17 +1680,17 @@
                     
                     if (isCustomScheduled) {
                         // 從 shiftName 解析時間（格式：自訂 14:00-20:00）
-                        const timeMatch = staffSched.shiftName.match(/(\d{2}:\d{2})-(\d{2}:\d{2})/);
+                        const timeMatch = staffSched.shiftName.match(/(\d{1,2}:\d{2})-(\d{1,2}:\d{2})/);
                         if (timeMatch) {
-                            customStartTime = timeMatch[1];
-                            customEndTime = timeMatch[2];
+                            customStartTime = normalizeTime(timeMatch[1]);  // 標準化時間格式
+                            customEndTime = normalizeTime(timeMatch[2]);
                         }
                     } else if (customTime) {
-                        // 使用員工填寫的自訂時間作為預設值
-                        const timeParts = customTime.split('-');
-                        if (timeParts.length === 2) {
-                            customStartTime = timeParts[0].trim();
-                            customEndTime = timeParts[1].trim();
+                        // ✨ 使用正則表達式解析員工填寫的自訂時間
+                        const timeMatch = customTime.match(/(\d{1,2}:\d{2})-(\d{1,2}:\d{2})/);
+                        if (timeMatch) {
+                            customStartTime = normalizeTime(timeMatch[1]);  // 標準化並補零
+                            customEndTime = normalizeTime(timeMatch[2]);
                         }
                     }
                     
