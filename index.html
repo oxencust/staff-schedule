@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>衡點-排班管理系統</title>
+    <title>衡點-排班管理系統 v6</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&display=swap');
         
@@ -378,7 +378,7 @@
 </head>
 <body>
     <nav class="navbar">
-        <h1>📋 衡點-排班管理系統</h1>
+        <h1>📋 衡點-排班管理系統 v6</h1>
         <span class="api-status" id="apiStatus">未連線</span>
     </nav>
 
@@ -1705,21 +1705,29 @@
                             onclick="toggleShiftBtn(this,'${shift.color}')">${shift.name}</button>`;
                     });
                     
-                    // 🆕 自訂按鈕
+                    // 🆕 自訂按鈕 + 時段選擇器（永遠顯示）
                     const customBtnClass = isCustomScheduled ? 'selected' : '';
                     const customBtnStyle = isCustomScheduled ? 'border-color:#a78bfa;background:#a78bfa' : 'border-color:#a78bfa';
-                    
-                    // ✨ 按鈕文字：如果有時段資訊，直接顯示
-                    let customBtnText = '⚙️ 自訂';
-                    if (customStartTime && customEndTime) {
-                        customBtnText = `⚙️ 自訂 ${customStartTime}-${customEndTime}`;
-                    }
                     
                     html += `<button class="shift-toggle-btn custom-shift-btn ${customBtnClass}" 
                         style="${customBtnStyle}"
                         data-shift-id="custom" data-staff="${staff.name}" data-is-leave="false"
-                        data-custom-start="${customStartTime}" data-custom-end="${customEndTime}"
-                        onclick="toggleCustomShift(this, '${staff.name}', '#a78bfa')">${customBtnText}</button>`;
+                        onclick="toggleCustomShift(this, '${staff.name}', '#a78bfa')">⚙️ 自訂</button>
+                        
+                        <span style="display:inline-flex;align-items:center;gap:3px;margin-left:4px;">
+                            <select class="custom-start-time" data-staff="${staff.name}" style="width:60px;font-size:11px;padding:2px;border:1px solid #d1d5db;border-radius:4px;" onchange="updateCustomTimeDisplay('${staff.name}')">
+                                <option value="">--</option>
+                                ${generateTimeOptions(customStartTime)}
+                            </select>
+                            <span style="font-size:11px;color:#666;">-</span>
+                            <select class="custom-end-time" data-staff="${staff.name}" style="width:60px;font-size:11px;padding:2px;border:1px solid #d1d5db;border-radius:4px;" onchange="updateCustomTimeDisplay('${staff.name}')">
+                                <option value="">--</option>
+                                ${generateTimeOptions(customEndTime)}
+                            </select>
+                            <span class="custom-hours-display" data-staff="${staff.name}" style="font-size:11px;color:#10b981;font-weight:600;margin-left:2px;white-space:nowrap;">
+                                ${customStartTime && customEndTime ? calculateAndFormatCustomHours(customStartTime, customEndTime) : ''}
+                            </span>
+                        </span>`;
                     
                     // 假別按鈕
                     const leaveShifts = shifts.filter(s => s.isLeave);
@@ -1747,29 +1755,14 @@
                     
                     html += `</div>
                         <div class="controls">
-                            <input type="text" class="note-input" data-staff="${staff.name}" value="${note}" placeholder="備註" style="width:50px;">
-                            
-                            <!-- 🆕 自訂時段選擇器 -->
-                            <div class="custom-time-control" data-staff="${staff.name}" style="display:${isCustomScheduled ? 'flex' : 'none'};align-items:center;gap:4px;background:#f3f4f6;padding:4px 8px;border-radius:6px;">
-                                <select class="custom-start-time" data-staff="${staff.name}" style="width:65px;font-size:11px;padding:3px;" onchange="updateCustomTimeDisplay('${staff.name}')">
-                                    ${generateTimeOptions(customStartTime)}
-                                </select>
-                                <span style="font-size:10px;">-</span>
-                                <select class="custom-end-time" data-staff="${staff.name}" style="width:65px;font-size:11px;padding:3px;" onchange="updateCustomTimeDisplay('${staff.name}')">
-                                    ${generateTimeOptions(customEndTime)}
-                                </select>
-                                <span class="custom-hours-display" data-staff="${staff.name}" style="font-size:11px;color:#10b981;font-weight:600;margin-left:4px;white-space:nowrap;">
-                                    ${customStartTime && customEndTime ? calculateAndFormatCustomHours(customStartTime, customEndTime) : ''}
-                                </span>
-                            </div>
-                            
-                            <!-- 加班時間選擇器 -->
-                            <div class="overtime-control" style="display:${isLeaveSelected || isCustomScheduled ? 'none' : 'flex'};align-items:center;gap:2px;">
+                            <!-- 加班時間選擇器（永遠顯示） -->
+                            <div class="overtime-control" style="display:flex;align-items:center;gap:2px;">
+                                <span style="font-size:10px;color:#666;">加班:</span>
                                 <select class="overtime-start" data-staff="${staff.name}" style="width:65px;font-size:11px;padding:2px;">
                                     <option value="">無加班</option>
                                     ${generateTimeOptions(overtimeStart)}
                                 </select>
-                                <span style="font-size:10px;">至</span>
+                                <span style="font-size:10px;">-</span>
                                 <select class="overtime-end" data-staff="${staff.name}" style="width:65px;font-size:11px;padding:2px;">
                                     <option value="">--</option>
                                     ${generateTimeOptions(overtimeEnd)}
@@ -1781,6 +1774,8 @@
                                 <input type="number" class="leave-hours-input" data-staff="${staff.name}" value="${leaveHours}" min="1" max="8" step="0.5" style="width:40px;">
                                 <span style="font-size:10px;color:#666;">h假</span>
                             </div>
+                            
+                            <input type="text" class="note-input" data-staff="${staff.name}" value="${note}" placeholder="備註" style="width:50px;">
                         </div>`;
                     
                     if (isAvailable) {
@@ -1841,39 +1836,10 @@
             btn.classList.add('selected');
             btn.style.background = color;
             
-            // 顯示/隱藏相關控制項
-            const customTimeControl = row.querySelector('.custom-time-control');
-            const overtimeControl = row.querySelector('.overtime-control');
+            // 自訂時段選擇器已經永遠顯示，不需要控制
+            // 只需要確保請假控制項隱藏
             const leaveControl = row.querySelector('.leave-control');
-            
-            if (customTimeControl) {
-                customTimeControl.style.display = 'flex';
-                console.log('✅ 自訂時段選擇器已顯示');
-            } else {
-                console.error('❌ 找不到 custom-time-control 元素');
-            }
-            if (overtimeControl) overtimeControl.style.display = 'none';
             if (leaveControl) leaveControl.style.display = 'none';
-            
-            // ✨ 讀取按鈕上的自訂時間資訊
-            const customStart = btn.dataset.customStart;
-            const customEnd = btn.dataset.customEnd;
-            
-            const startSelect = row.querySelector('.custom-start-time');
-            const endSelect = row.querySelector('.custom-end-time');
-            if (startSelect && endSelect) {
-                // 優先使用按鈕上的時間，否則使用預設值
-                if (customStart && customEnd) {
-                    startSelect.value = customStart;
-                    endSelect.value = customEnd;
-                    console.log(`✅ 自動帶入時段: ${customStart}-${customEnd}`);
-                } else {
-                    // 如果沒有預設值，使用 09:00-18:00
-                    if (!startSelect.value) startSelect.value = '09:00';
-                    if (!endSelect.value) endSelect.value = '18:00';
-                }
-                updateCustomTimeDisplay(staffName);
-            }
         }
         
         function toggleShiftBtn(btn, color) {
@@ -1889,16 +1855,15 @@
             btn.classList.add('selected');
             btn.style.background = color;
             
+            // 只控制請假時數的顯示/隱藏
             const isLeave = btn.dataset.isLeave === 'true';
-            const overtimeControl = row.querySelector('.overtime-control');
             const leaveControl = row.querySelector('.leave-control');
-            const customTimeControl = row.querySelector('.custom-time-control');  // 🆕
             
-            if (overtimeControl && leaveControl) {
-                overtimeControl.style.display = isLeave ? 'none' : 'flex';
+            if (leaveControl) {
                 leaveControl.style.display = isLeave ? 'flex' : 'none';
-                if (customTimeControl) customTimeControl.style.display = 'none';  // 🆕 隱藏自訂控制項
             }
+            
+            // 加班時段和自訂時段選擇器永遠顯示，不需要控制
         }
 
         function confirmSchedule() {
