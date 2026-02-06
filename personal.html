@@ -1597,10 +1597,10 @@
             fragment.appendChild(allDayDiv);
             
             // 班別選項
-            shifts.forEach(shift => {
-                const shiftDiv = document.createElement('div');
-                shiftDiv.className = 'shift-option';
-                shiftDiv.id = `shift_${shift.id}_option`;
+            shifts.filter(shift => !shift.isLeave).forEach(shift => {
+    const shiftDiv = document.createElement('div');
+    shiftDiv.className = 'shift-option';
+    shiftDiv.id = `shift_${shift.id}_option`;
                 shiftDiv.onclick = () => toggleShiftOption(shift.id);
                 shiftDiv.style.borderLeft = `4px solid ${shift.color}`;
                 shiftDiv.innerHTML = `
