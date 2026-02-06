@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>衡點-排班管理系統 v6</title>
+    <title>衡點-排班管理系統</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&display=swap');
         
@@ -378,7 +378,7 @@
 </head>
 <body>
     <nav class="navbar">
-        <h1>📋 衡點-排班管理系統 v6</h1>
+        <h1>📋 衡點-排班管理系統</h1>
         <span class="api-status" id="apiStatus">未連線</span>
     </nav>
 
@@ -546,19 +546,26 @@
         let savedMonths = [];  // ✨ 新增：追蹤已儲存的月份
 
         window.onload = async function() {
+            console.log('🚀 系統啟動...');
+            const startTime = Date.now();
+            
             // 載入已儲存月份記錄
             const saved = localStorage.getItem('savedMonths');
             if (saved) savedMonths = JSON.parse(saved);
             
-            await loadAllData();
-            holidays = await fetchHolidays(currentYear);
-            
-            // ✨ 新邏輯：優先從 API 載入，如果沒資料才自動排班
-            await loadScheduleData(getCurrentMonthStr());
+            // ✨ 並行載入所有資料
+            await Promise.all([
+                loadAllData(),
+                (async () => { holidays = await fetchHolidays(currentYear); })(),
+                loadScheduleData(getCurrentMonthStr())
+            ]);
             
             generateCalendar();
             updateLegend();
             updateApiStatus();
+            
+            const elapsed = Date.now() - startTime;
+            console.log(`✅ 系統載入完成（${elapsed}ms）`);
         };
         
         // ============ 🆕 自動排班核心功能 ============
@@ -771,14 +778,81 @@
             if (tabId === 'leave') { loadPendingLeave(); }
         }
 
-        async function loadAllData() { await loadStaff(); await loadShifts(); await loadStaffTypes(); }
+        // ✨ 快取輔助函數
+        function getCachedData(key, maxAgeMinutes = 5) {
+            const cached = localStorage.getItem(key);
+            if (!cached) return null;
+            
+            try {
+                const { data, timestamp } = JSON.parse(cached);
+                const age = (Date.now() - timestamp) / 1000 / 60; // 分鐘
+                
+                if (age < maxAgeMinutes) {
+                    console.log(`✅ 使用快取：${key} (${age.toFixed(1)}分鐘前)`);
+                    return data;
+                }
+                console.log(`⏰ 快取過期：${key} (${age.toFixed(1)}分鐘前)`);
+            } catch (e) {
+                console.error('解析快取失敗:', key, e);
+            }
+            return null;
+        }
+        
+        function setCachedData(key, data) {
+            localStorage.setItem(key, JSON.stringify({
+                data,
+                timestamp: Date.now()
+            }));
+        }
+        
+        function clearCache(key) {
+            if (key) {
+                localStorage.removeItem(key);
+                console.log(`🗑️ 清除快取：${key}`);
+            } else {
+                // 清除所有快取
+                ['shifts_cache', 'staff_cache', 'staffTypes_cache'].forEach(k => {
+                    localStorage.removeItem(k);
+                });
+                console.log('🗑️ 清除所有快取');
+            }
+        }
+        
+        // ✨ 並行載入所有資料
+        async function loadAllData() {
+            console.log('📥 開始載入資料（並行）...');
+            const startTime = Date.now();
+            
+            // 並行執行所有載入
+            await Promise.all([
+                loadStaff(),
+                loadShifts(),
+                loadStaffTypes()
+            ]);
+            
+            const elapsed = Date.now() - startTime;
+            console.log(`✅ 所有資料載入完成（${elapsed}ms）`);
+        }
 
         async function loadStaff() {
+            // 先檢查快取
+            const cached = getCachedData('staff_cache');
+            if (cached) {
+                staffList = cached;
+                renderStaffList();
+                return;
+            }
+            
+            // 從 API 載入
             if (!API_URL) return;
             try {
                 const res = await fetch(API_URL + '?action=getStaff');
                 const data = await res.json();
-                if (data.success) { staffList = data.staff; renderStaffList(); }
+                if (data.success) { 
+                    staffList = data.staff;
+                    setCachedData('staff_cache', staffList); // 快取
+                    renderStaffList();
+                }
             } catch (e) { console.error('載入員工失敗', e); }
         }
 
@@ -825,7 +899,12 @@
                 const payload = encodeURIComponent(JSON.stringify({ name, staffType }));
                 const res = await fetch(API_URL + '?action=addStaff&data=' + payload);
                 const data = await res.json();
-                if (data.success) { showToast('✅ 員工已新增'); closeModal('addStaffModal'); await loadStaff(); }
+                if (data.success) { 
+                    showToast('✅ 員工已新增'); 
+                    closeModal('addStaffModal');
+                    clearCache('staff_cache'); // 清除快取
+                    await loadStaff(); // 重新載入
+                }
                 else { showToast('❌ ' + (data.error || '新增失敗')); }
             } catch (e) { showToast('❌ 新增失敗'); }
         }
@@ -846,7 +925,8 @@
                 const data = await res.json();
                 if (data.success) { 
                     showToast('✅ 員工類型已更新'); 
-                    closeModal('editStaffModal'); 
+                    closeModal('editStaffModal');
+                    clearCache('staff_cache'); // 清除快取
                     const staff = staffList.find(s => s.name === name);
                     if (staff) staff.staffType = staffType;
                     renderStaffList();
@@ -860,7 +940,11 @@
             try {
                 const res = await fetch(API_URL + '?action=deleteStaff&name=' + encodeURIComponent(name));
                 const data = await res.json();
-                if (data.success) { showToast('✅ 員工已刪除'); await loadStaff(); }
+                if (data.success) { 
+                    showToast('✅ 員工已刪除');
+                    clearCache('staff_cache'); // 清除快取
+                    await loadStaff(); // 重新載入
+                }
                 else { showToast('❌ ' + (data.error || '刪除失敗')); }
             } catch (e) { showToast('❌ 刪除失敗'); }
         }
@@ -868,11 +952,26 @@
         function copyLink(link) { navigator.clipboard.writeText(link).then(() => showToast('✅ 已複製連結')); }
 
         async function loadShifts() {
+            // 先檢查快取
+            const cached = getCachedData('shifts_cache');
+            if (cached) {
+                shifts = cached;
+                renderShiftList();
+                updateLegend();
+                return;
+            }
+            
+            // 從 API 載入
             if (!API_URL) return;
             try {
                 const res = await fetch(API_URL + '?action=getShifts');
                 const data = await res.json();
-                if (data.success) { shifts = data.shifts; renderShiftList(); updateLegend(); }
+                if (data.success) { 
+                    shifts = data.shifts;
+                    setCachedData('shifts_cache', shifts); // 快取
+                    renderShiftList();
+                    updateLegend();
+                }
             } catch (e) { console.error('載入班別失敗', e); }
         }
         
@@ -880,12 +979,22 @@
         let staffTypes = ['正職', 'PT', '半薪正職'];
         
         async function loadStaffTypes() {
+            // 先檢查快取
+            const cached = getCachedData('staffTypes_cache');
+            if (cached) {
+                staffTypes = cached;
+                updateTypeSelects();
+                return;
+            }
+            
+            // 從 API 載入
             if (!API_URL) return;
             try {
                 const res = await fetch(API_URL + '?action=getStaffTypes');
                 const data = await res.json();
                 if (data.success && data.types) { 
                     staffTypes = data.types;
+                    setCachedData('staffTypes_cache', staffTypes); // 快取
                     updateTypeSelects();
                 }
             } catch (e) { console.error('載入類型失敗', e); }
@@ -941,6 +1050,7 @@
                 if (data.success) {
                     staffTypes.push(typeName);
                     input.value = '';
+                    clearCache('staffTypes_cache'); // 清除快取
                     renderTypeList();
                     updateTypeSelects();
                     showToast('✅ 類型已新增');
@@ -959,6 +1069,7 @@
                 const data = await res.json();
                 if (data.success) {
                     staffTypes = staffTypes.filter(t => t !== typeName);
+                    clearCache('staffTypes_cache'); // 清除快取
                     renderTypeList();
                     updateTypeSelects();
                     showToast('✅ 類型已刪除');
@@ -1093,7 +1204,11 @@
                 const payload = encodeURIComponent(JSON.stringify(shifts));
                 const res = await fetch(API_URL + '?action=saveShifts&data=' + payload);
                 const data = await res.json();
-                if (data.success) { showToast('✅ 班別已儲存'); updateLegend(); }
+                if (data.success) { 
+                    showToast('✅ 班別已儲存');
+                    clearCache('shifts_cache'); // 清除快取
+                    await loadShifts(); // 重新載入
+                }
                 else { showToast('❌ 儲存失敗'); }
             } catch (e) { showToast('❌ 儲存失敗'); }
         }
@@ -1593,10 +1708,18 @@
                     // 🆕 自訂按鈕
                     const customBtnClass = isCustomScheduled ? 'selected' : '';
                     const customBtnStyle = isCustomScheduled ? 'border-color:#a78bfa;background:#a78bfa' : 'border-color:#a78bfa';
+                    
+                    // ✨ 按鈕文字：如果有時段資訊，直接顯示
+                    let customBtnText = '⚙️ 自訂';
+                    if (customStartTime && customEndTime) {
+                        customBtnText = `⚙️ 自訂 ${customStartTime}-${customEndTime}`;
+                    }
+                    
                     html += `<button class="shift-toggle-btn custom-shift-btn ${customBtnClass}" 
                         style="${customBtnStyle}"
                         data-shift-id="custom" data-staff="${staff.name}" data-is-leave="false"
-                        onclick="toggleCustomShift(this, '${staff.name}', '#a78bfa')">⚙️ 自訂</button>`;
+                        data-custom-start="${customStartTime}" data-custom-end="${customEndTime}"
+                        onclick="toggleCustomShift(this, '${staff.name}', '#a78bfa')">${customBtnText}</button>`;
                     
                     // 假別按鈕
                     const leaveShifts = shifts.filter(s => s.isLeave);
@@ -1723,16 +1846,32 @@
             const overtimeControl = row.querySelector('.overtime-control');
             const leaveControl = row.querySelector('.leave-control');
             
-            if (customTimeControl) customTimeControl.style.display = 'flex';
+            if (customTimeControl) {
+                customTimeControl.style.display = 'flex';
+                console.log('✅ 自訂時段選擇器已顯示');
+            } else {
+                console.error('❌ 找不到 custom-time-control 元素');
+            }
             if (overtimeControl) overtimeControl.style.display = 'none';
             if (leaveControl) leaveControl.style.display = 'none';
             
-            // 如果時間還沒設定，使用預設值
+            // ✨ 讀取按鈕上的自訂時間資訊
+            const customStart = btn.dataset.customStart;
+            const customEnd = btn.dataset.customEnd;
+            
             const startSelect = row.querySelector('.custom-start-time');
             const endSelect = row.querySelector('.custom-end-time');
             if (startSelect && endSelect) {
-                if (!startSelect.value) startSelect.value = '09:00';
-                if (!endSelect.value) endSelect.value = '18:00';
+                // 優先使用按鈕上的時間，否則使用預設值
+                if (customStart && customEnd) {
+                    startSelect.value = customStart;
+                    endSelect.value = customEnd;
+                    console.log(`✅ 自動帶入時段: ${customStart}-${customEnd}`);
+                } else {
+                    // 如果沒有預設值，使用 09:00-18:00
+                    if (!startSelect.value) startSelect.value = '09:00';
+                    if (!endSelect.value) endSelect.value = '18:00';
+                }
                 updateCustomTimeDisplay(staffName);
             }
         }
@@ -1940,6 +2079,7 @@
         }
         async function refreshData() { 
             showToast('🔄 重新整理...'); 
+            clearCache(); // 清除所有快取
             await loadAllData(); 
             holidays = await fetchHolidays(currentYear); 
             await loadScheduleData(getCurrentMonthStr());
