@@ -498,7 +498,7 @@
             </div>
 
             <div class="submit-section">
-                <!-- 回填加班按鈕（1-5號顯示，非回填模式時） -->
+                <!-- 回填加班按鈕（1-8號顯示，非回填模式時） -->
                 <div id="overtimeEntryBtn" style="display: none; margin-bottom: 10px;">
                     <button class="btn" onclick="enterOvertimeMode()" style="width: 100%; background: linear-gradient(135deg, #f59e0b, #d97706); color: white; padding: 12px; font-weight: 600;">
                         📋 回填上月加班時間
@@ -699,6 +699,63 @@
     <div class="toast" id="toast"></div>
 
     <script>
+        // ============ 快取工具函數 ============
+        
+        /**
+         * 設定快取
+         * @param {string} key - 快取鍵名
+         * @param {any} data - 要快取的資料
+         * @param {number} days - 快取天數
+         */
+        function setCache(key, data, days) {
+            try {
+                const item = {
+                    data: data,
+                    expiry: Date.now() + (days * 24 * 60 * 60 * 1000)
+                };
+                localStorage.setItem(key, JSON.stringify(item));
+            } catch (e) {
+                console.warn('快取儲存失敗:', e);
+            }
+        }
+        
+        /**
+         * 取得快取
+         * @param {string} key - 快取鍵名
+         * @returns {any|null} - 快取資料，過期或不存在則返回 null
+         */
+        function getCache(key) {
+            try {
+                const itemStr = localStorage.getItem(key);
+                if (!itemStr) return null;
+                
+                const item = JSON.parse(itemStr);
+                
+                // 檢查是否過期
+                if (Date.now() > item.expiry) {
+                    localStorage.removeItem(key);
+                    return null;
+                }
+                
+                return item.data;
+            } catch (e) {
+                console.warn('快取讀取失敗:', e);
+                return null;
+            }
+        }
+        
+        /**
+         * 清除指定快取
+         * @param {string} key - 快取鍵名
+         */
+        function clearCache(key) {
+            try {
+                localStorage.removeItem(key);
+            } catch (e) {
+                console.warn('快取清除失敗:', e);
+            }
+        }
+        
         // ============ 設定區 ============
         const API_URL = 'https://script.google.com/macros/s/AKfycbz2WpGKOuUlmEVwJAo1C-lmGSZQv5shnxwMor-4M1qbr3e1CrZfBhD-PVnQGaSnm49jkg/exec';
         
@@ -716,7 +773,7 @@
         let currentOvertimeDate = null;
         let currentMonthSchedules = {};
 
-        // ⚡ 方案1：並行載入優化
+        // ⚡ 並行載入優化
         window.onload = async function() {
             const urlParams = new URLSearchParams(window.location.search);
             staffName = urlParams.get('name') || urlParams.get('staff') || '';
@@ -1260,13 +1317,25 @@
         }
 
         async function loadShifts() {
+            // 🆕 先檢查快取
+            const cacheKey = 'shifts_cache';
+            const cached = getCache(cacheKey);
+            
+            if (cached) {
+                console.log('✅ 使用快取的班別資料');
+                shifts = cached;
+                loadLeaveOptions(shifts);
+                return shifts;
+            }
+            
+            // 快取未命中，從 API 載入
             if (!API_URL) {
                 shifts = [
                     { id: 'shift1', name: '午班', time: '12:00-18:00', color: '#9fcccc' },
                     { id: 'shift2', name: '晚班', time: '18:00-22:00', color: '#a78bfa' }
                 ];
                 loadLeaveOptions([]);
-                return;
+                return shifts;
             }
             
             try {
@@ -1274,14 +1343,21 @@
                 const data = await res.json();
                 if (data.success && data.shifts) { 
                     shifts = data.shifts;
+                    
+                    // 🆕 儲存到快取（7 天）
+                    setCache(cacheKey, shifts, 7);
+                    
                     loadLeaveOptions(data.shifts);
+                    return shifts;
                 }
             } catch (e) {
+                console.error('載入班別失敗', e);
                 shifts = [
                     { id: 'shift1', name: '午班', time: '12:00-18:00', color: '#9fcccc' },
                     { id: 'shift2', name: '晚班', time: '18:00-22:00', color: '#a78bfa' }
                 ];
                 loadLeaveOptions([]);
+                return shifts;
             }
         }
         
@@ -1323,6 +1399,16 @@
         }
 
         async function fetchHolidays(year) {
+            // 🆕 先檢查快取
+            const cacheKey = `holidays_${year}`;
+            const cached = getCache(cacheKey);
+            
+            if (cached) {
+                console.log(`✅ 使用快取的 ${year} 年國定假日`);
+                return cached;
+            }
+            
+            // 快取未命中，從 API 載入
             try {
                 const res = await fetch('https://cdn.jsdelivr.net/gh/ruyut/TaiwanCalendar/data/' + year + '.json');
                 const data = await res.json();
@@ -1335,7 +1421,11 @@
                             holidays.push({ date: formattedDate, name: record.description });
                         }
                     });
-                    console.log('已載入 ' + year + ' 年假日：', holidays.length + ' 筆');
+                    console.log('✅ 已載入 ' + year + ' 年假日：', holidays.length + ' 筆');
+                    
+                    // 🆕 儲存到快取（30 天）
+                    setCache(cacheKey, holidays, 30);
+                    
                     return holidays;
                 }
             } catch (e) {
@@ -1353,18 +1443,27 @@
             const totalCells = Math.ceil((firstDayOfWeek + lastDay.getDate()) / 7) * 7;
             const calendarDays = [];
             let dayCounter = 1 - firstDayOfWeek;
-            for (let i = 0; i < totalCells; i++) { calendarDays.push(new Date(currentYear, currentMonth, dayCounter++)); }
+            for (let i = 0; i < totalCells; i++) { 
+                calendarDays.push(new Date(currentYear, currentMonth, dayCounter++)); 
+            }
             
             const body = document.getElementById('calendarBody');
             body.innerHTML = '';
+            
+            // ⚡ DOM 優化：使用 DocumentFragment
+            const fragment = document.createDocumentFragment();
             
             for (let week = 0; week < calendarDays.length / 7; week++) {
                 const row = document.createElement('div');
                 row.className = 'week-row';
                 row.innerHTML = `<div class="week-label">W${week + 1}</div>`;
-                for (let day = 0; day < 7; day++) { row.appendChild(createDayCell(calendarDays[week * 7 + day])); }
-                body.appendChild(row);
+                for (let day = 0; day < 7; day++) { 
+                    row.appendChild(createDayCell(calendarDays[week * 7 + day])); 
+                }
+                fragment.appendChild(row);  // ← 只在記憶體中操作
             }
+            
+            body.appendChild(fragment);  // ← 只觸發 1 次 reflow
         }
 
         function createDayCell(date) {
@@ -1479,44 +1578,73 @@
 
         function renderShiftOptions() {
             const container = document.getElementById('shiftOptionsContainer');
-            let html = `
-                <div class="shift-option" id="allDayOption" onclick="toggleShiftOption('allDay')">
-                    <div class="shift-option-checkbox"></div>
-                    <div class="shift-option-label">
-                        <div class="shift-option-title">✅ 整天可上班</div>
-                        <div class="shift-option-time">全天都可以排班</div>
-                    </div>
+            
+            // ⚡ DOM 優化：使用 DocumentFragment
+            const fragment = document.createDocumentFragment();
+            
+            // 整天可上班選項
+            const allDayDiv = document.createElement('div');
+            allDayDiv.className = 'shift-option';
+            allDayDiv.id = 'allDayOption';
+            allDayDiv.onclick = () => toggleShiftOption('allDay');
+            allDayDiv.innerHTML = `
+                <div class="shift-option-checkbox"></div>
+                <div class="shift-option-label">
+                    <div class="shift-option-title">✅ 整天可上班</div>
+                    <div class="shift-option-time">全天都可以排班</div>
                 </div>
             `;
+            fragment.appendChild(allDayDiv);
+            
+            // 班別選項
             shifts.forEach(shift => {
-                html += `
-                    <div class="shift-option" id="shift_${shift.id}_option" onclick="toggleShiftOption('${shift.id}')" style="border-left: 4px solid ${shift.color};">
-                        <div class="shift-option-checkbox"></div>
-                        <div class="shift-option-label">
-                            <div class="shift-option-title">${shift.name}</div>
-                            <div class="shift-option-time">${shift.time}</div>
-                        </div>
-                        <div class="shift-option-color" style="background: ${shift.color}; width: 20px; height: 20px; border-radius: 4px;"></div>
-                    </div>
-                `;
-            });
-            html += `
-                <div class="shift-option" id="customShiftOption" onclick="toggleShiftOption('custom')" style="border-left: 4px solid #999;">
+                const shiftDiv = document.createElement('div');
+                shiftDiv.className = 'shift-option';
+                shiftDiv.id = `shift_${shift.id}_option`;
+                shiftDiv.onclick = () => toggleShiftOption(shift.id);
+                shiftDiv.style.borderLeft = `4px solid ${shift.color}`;
+                shiftDiv.innerHTML = `
                     <div class="shift-option-checkbox"></div>
                     <div class="shift-option-label">
-                        <div class="shift-option-title">🕐 其他班別</div>
-                        <div class="shift-option-time">自訂可上班時間</div>
+                        <div class="shift-option-title">${shift.name}</div>
+                        <div class="shift-option-time">${shift.time}</div>
                     </div>
-                </div>
-                <div class="custom-shift-inputs" id="customShiftInputs">
-                    <div class="custom-time-row">
-                        <input type="time" class="custom-time-input" id="customStartTime" value="12:00">
-                        <span class="custom-time-separator">～</span>
-                        <input type="time" class="custom-time-input" id="customEndTime" value="18:00">
-                    </div>
+                    <div class="shift-option-color" style="background: ${shift.color}; width: 20px; height: 20px; border-radius: 4px;"></div>
+                `;
+                fragment.appendChild(shiftDiv);
+            });
+            
+            // 自訂時間選項
+            const customDiv = document.createElement('div');
+            customDiv.className = 'shift-option';
+            customDiv.id = 'customShiftOption';
+            customDiv.onclick = () => toggleShiftOption('custom');
+            customDiv.style.borderLeft = '4px solid #999';
+            customDiv.innerHTML = `
+                <div class="shift-option-checkbox"></div>
+                <div class="shift-option-label">
+                    <div class="shift-option-title">🕐 其他班別</div>
+                    <div class="shift-option-time">自訂可上班時間</div>
                 </div>
             `;
-            container.innerHTML = html;
+            fragment.appendChild(customDiv);
+            
+            // 自訂時間輸入
+            const customInputDiv = document.createElement('div');
+            customInputDiv.className = 'custom-shift-inputs';
+            customInputDiv.id = 'customShiftInputs';
+            customInputDiv.innerHTML = `
+                <div class="custom-time-row">
+                    <input type="time" class="custom-time-input" id="customStartTime" value="12:00">
+                    <span class="custom-time-separator">～</span>
+                    <input type="time" class="custom-time-input" id="customEndTime" value="18:00">
+                </div>
+            `;
+            fragment.appendChild(customInputDiv);
+            
+            // ⚡ 一次性插入
+            container.innerHTML = '';
+            container.appendChild(fragment);
         }
 
         function openShiftModal(dateStr) {
