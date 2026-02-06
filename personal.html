@@ -1636,7 +1636,7 @@ customInputDiv.id = 'customShiftInputs';
 
 // 生成時間選項（只有整點和30分）
 let timeOptions = '<option value="">請選擇</option>';
-for (let h = 0; h <= 23; h++) {
+for (let h = 6; h <= 23; h++) {
     const hour = String(h).padStart(2, '0');
     timeOptions += `<option value="${hour}:00">${hour}:00</option>`;
     timeOptions += `<option value="${hour}:30">${hour}:30</option>`;
