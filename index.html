@@ -541,7 +541,7 @@
             });
         }
         // ============ 設定區（請在這裡修改）============
-        const API_URL = 'https://script.google.com/macros/s/AKfycbyo7kOwFLo2eRM3tCh2zlp7UBKquXI9lsN0OSnGO288YwbXMky5k7V5Gnk3jFehmeGKJQ/exec';
+        const API_URL = 'https://script.google.com/macros/s/AKfycbxhfLcZhkec3TwXn0JCgT1ajPo12n3-jzQel5K5mDPJ8JgMFn87Qs7oS6czHkoCTAMAXg/exec';
         
         let staffList = [];
         let shifts = [];
@@ -1319,9 +1319,10 @@
     let workInfo;
     
     if (shift && shift.time) {
-        // 有找到班別且有時間
-        workInfo = calculateWorkHours(shift.time);
-    } else if (item.shiftName && item.shiftName.startsWith('自訂')) {
+    workInfo = calculateWorkHours(shift.time);
+} else if (item.shiftTime) {
+    workInfo = calculateWorkHours(item.shiftTime);
+} else if (item.shiftName && item.shiftName.startsWith('自訂')) {
         // 自訂班別：從 shiftName 解析時間
         const timeMatch = item.shiftName.match(/(\d{2}:\d{2})-(\d{2}:\d{2})/);
         if (timeMatch) {
@@ -1360,7 +1361,7 @@
                                 leaveDisplay = ` <span style="color:#9ca3af;">${leaveIcon}-${item.leaveHours}h</span>`;
                             }
                             
-                            const timeHtml = shift && shift.time ? '<div class="time">' + shift.time + '</div>' : '';
+                            const timeHtml = (shift && shift.time) ? '<div class="time">' + shift.time + '</div>' : (item.shiftTime ? '<div class="time">' + item.shiftTime + '</div>' : '');
                             html += '<div>' + item.staffName + ' ' + shiftName + note + overtimeDisplay + leaveDisplay + '</div>';
                             html += timeHtml;
                         }
@@ -1471,9 +1472,10 @@
     let workInfo;
     
     if (shift && shift.time) {
-        // 有找到班別且有時間
-        workInfo = calculateWorkHours(shift.time);
-    } else if (item.shiftName && item.shiftName.startsWith('自訂')) {
+    workInfo = calculateWorkHours(shift.time);
+} else if (item.shiftTime) {
+    workInfo = calculateWorkHours(item.shiftTime);
+} else if (item.shiftName && item.shiftName.startsWith('自訂')) {
         // 自訂班別：從 shiftName 解析時間
         const timeMatch = item.shiftName.match(/(\d{2}:\d{2})-(\d{2}:\d{2})/);
         if (timeMatch) {
@@ -1938,6 +1940,7 @@
                             staffName, 
                             shiftId, 
                             shiftName: shift ? shift.name : shiftId,
+                            shiftTime: shift ? (shift.time || '') : '',
                             note 
                         };
                         
