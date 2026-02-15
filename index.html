@@ -541,7 +541,7 @@
             });
         }
         // ============ 設定區（請在這裡修改）============
-        const API_URL = 'https://script.google.com/macros/s/AKfycbw7eSYBxFCXjJCfAwm5vXup7KfZqxNvvv6dACe507Hxb6VhwlDF9pP9IBlwBZ8cb5nLEQ/exec';
+        const API_URL = 'https://script.google.com/macros/s/AKfycbyo7kOwFLo2eRM3tCh2zlp7UBKquXI9lsN0OSnGO288YwbXMky5k7V5Gnk3jFehmeGKJQ/exec';
         
         let staffList = [];
         let shifts = [];
@@ -1105,6 +1105,7 @@
                         <div class="shift-color-preview" style="background: ${shift.color};"></div>
                         <input type="text" class="shift-name" value="${shift.name}" onchange="updateShiftName(${realIndex}, this.value)">
                         <input type="text" class="shift-time" value="${shift.time || ''}" placeholder="00:00-00:00" onchange="updateShiftTime(${realIndex}, this.value)">
+                        <button class="delete-btn" style="background:${shift.disabled ? '#fef3c7' : '#e0f2fe'};color:${shift.disabled ? '#92400e' : '#0369a1'};" onclick="toggleShiftDisabled(${realIndex})">${shift.disabled ? '🔒 已停用' : '✅ 使用中'}</button>
                         <button class="delete-btn" onclick="deleteShift(${realIndex})">刪除</button>
                     </div>`;
                 });
@@ -1127,6 +1128,7 @@
                             <option value="補休" ${shift.leaveType === '補休' ? 'selected' : ''}>補休</option>
                         </select>
                         <span style="font-size:11px;color:#666;">（排班時可填時數）</span>
+                        <button class="delete-btn" style="background:${shift.disabled ? '#fef3c7' : '#e0f2fe'};color:${shift.disabled ? '#92400e' : '#0369a1'};" onclick="toggleShiftDisabled(${realIndex})">${shift.disabled ? '🔒 已停用' : '✅ 使用中'}</button>
                         <button class="delete-btn" onclick="deleteShift(${realIndex})">刪除</button>
                     </div>`;
                 });
@@ -1200,6 +1202,11 @@
             renderShiftList();
         }
 
+        function toggleShiftDisabled(i) {
+            shifts[i].disabled = !shifts[i].disabled;
+            renderShiftList();
+            updateLegend();
+        }
         function updateShiftColor(i, v) { shifts[i].color = v; renderShiftList(); }
         function updateShiftName(i, v) { shifts[i].name = v; }
         function updateShiftTime(i, v) { shifts[i].time = v; }
@@ -1222,7 +1229,7 @@
 
         function updateLegend() {
             let html = `<div class="legend-item"><div class="legend-color" style="background: var(--green-light); border: 1px solid var(--green);"></div><span>可上班</span></div>`;
-            shifts.forEach(s => { html += `<div class="legend-item"><div class="legend-color" style="background: ${s.color};"></div><span>${s.name}</span></div>`; });
+            shifts.filter(s => !s.disabled).forEach(s => { html += `<div class="legend-item"><div class="legend-color" style="background: ${s.color};"></div><span>${s.name}</span></div>`; });
             document.getElementById('legendBar').innerHTML = html;
         }
 
@@ -1714,7 +1721,7 @@
                                 onclick="toggleShiftBtn(this, '#9ca3af')">不排</button>`;
                     
                     // 一般班別按鈕
-                    shifts.filter(s => !s.isLeave).forEach(shift => {
+                    shifts.filter(s => !s.isLeave && !s.disabled).forEach(shift => {
                         const isSelected = staffSched && staffSched.shiftId === shift.id;
                         const btnClass = isSelected ? 'selected' : '';
                         const style = `border-color:${shift.color};${isSelected ? 'background:' + shift.color : ''}`;
@@ -1751,7 +1758,7 @@
                         </span>`;
                     
                     // 假別按鈕
-                    const leaveShifts = shifts.filter(s => s.isLeave);
+                    const leaveShifts = shifts.filter(s => s.isLeave && !s.disabled);
                     if (leaveShifts.length > 0) {
                         html += `<span style="margin-left:5px;color:#ddd;">|</span>`;
                         leaveShifts.forEach(shift => {
