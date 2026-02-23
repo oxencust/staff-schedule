@@ -1992,73 +1992,81 @@
         }
 
         async function exportSchedule() {
-            if (!API_URL) { showToast('請先設定 API'); return; }
-            
-            const d = {};
-            const lastDay = new Date(currentYear, currentMonth + 1, 0);
-            
-            for (let day = 1; day <= lastDay.getDate(); day++) {
-                const date = new Date(currentYear, currentMonth, day);
-                const dateStr = formatDate(date);
-                const daySchedule = schedule[dateStr] || [];
-                
-                if (daySchedule.length > 0) {
-                    d[day] = daySchedule.map(item => [
-                        item.staffName,
-                        item.shiftId,
-                        item.overtime || 0,
-                        item.note || '',
-                        item.leaveHours || 0,
-                        item.shiftName || ''
-                    ]);
+    if (!API_URL) { showToast('請先設定 API'); return; }
+    
+    const d = {};
+    const lastDay = new Date(currentYear, currentMonth + 1, 0);
+    
+    for (let day = 1; day <= lastDay.getDate(); day++) {
+        const date = new Date(currentYear, currentMonth, day);
+        const dateStr = formatDate(date);
+        const daySchedule = schedule[dateStr] || [];
+        
+        if (daySchedule.length > 0) {
+            d[day] = daySchedule.map(item => {
+                // 🆕 計算加班時數（只計算已審核的）
+                let overtimeHours = 0;
+                if (item.overtimeStart && item.overtimeEnd && item.overtimeStatus === '已審核') {
+                    overtimeHours = calculateOvertimeHours(item.overtimeStart, item.overtimeEnd);
                 }
-            }
-            
-            if (Object.keys(d).length === 0) { 
-                showToast('沒有排班資料'); 
-                return; 
-            }
-            
-            const monthStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
-            const h = holidays.filter(x => x.date.startsWith(monthStr)).map(x => parseInt(x.date.split('-')[2]));
-            
-            const staffStats = {};
-            staffList.forEach(s => { staffStats[s.name] = 0; });
-            for (const dateStr in schedule) {
-                if (dateStr.startsWith(monthStr)) {
-                    schedule[dateStr].forEach(item => {
-                        staffStats[item.staffName] = (staffStats[item.staffName] || 0) + 1;
-                    });
-                }
-            }
-            const sortedStaffNames = staffList
-                .sort((a, b) => (staffStats[b.name] || 0) - (staffStats[a.name] || 0))
-                .map(s => s.name);
-            
-            showToast('📤 匯出中...');
-            
-            try {
-                const payload = {
-                    action: 'exportSchedule',
-                    y: currentYear,
-                    m: currentMonth + 1,
-                    d: d,
-                    h: h,
-                    s: sortedStaffNames
-                };
                 
-                const res = await fetch(API_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'text/plain' },
-                    body: JSON.stringify(payload)
-                });
-                const data = await res.json();
-                showToast(data.success ? '✅ ' + data.message : '❌ 匯出失敗：' + (data.error || ''));
-            } catch (e) { 
-                console.error('匯出失敗', e);
-                showToast('❌ 匯出失敗：' + e.message); 
-            }
+                return [
+                    item.staffName,
+                    item.shiftId,
+                    overtimeHours,  // ← 使用計算後的時數
+                    item.note || '',
+                    item.leaveHours || 0,
+                    item.shiftName || ''
+                ];
+            });
         }
+    }
+    
+    if (Object.keys(d).length === 0) { 
+        showToast('沒有排班資料'); 
+        return; 
+    }
+    
+    const monthStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
+    const h = holidays.filter(x => x.date.startsWith(monthStr)).map(x => parseInt(x.date.split('-')[2]));
+    
+    const staffStats = {};
+    staffList.forEach(s => { staffStats[s.name] = 0; });
+    for (const dateStr in schedule) {
+        if (dateStr.startsWith(monthStr)) {
+            schedule[dateStr].forEach(item => {
+                staffStats[item.staffName] = (staffStats[item.staffName] || 0) + 1;
+            });
+        }
+    }
+    const sortedStaffNames = staffList
+        .sort((a, b) => (staffStats[b.name] || 0) - (staffStats[a.name] || 0))
+        .map(s => s.name);
+    
+    showToast('📤 匯出中...');
+    
+    try {
+        const payload = {
+            action: 'exportSchedule',
+            y: currentYear,
+            m: currentMonth + 1,
+            d: d,
+            h: h,
+            s: sortedStaffNames
+        };
+        
+        const res = await fetch(API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        showToast(data.success ? '✅ ' + data.message : '❌ 匯出失敗：' + (data.error || ''));
+    } catch (e) { 
+        console.error('匯出失敗', e);
+        showToast('❌ 匯出失敗：' + e.message); 
+    }
+}
 
         async function prevMonth() { 
             showToast('⏳ 載入中...');
