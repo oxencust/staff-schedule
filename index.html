@@ -1299,87 +1299,86 @@
                 html += '</div>';
                 
                 if (schedule[dateStr] && schedule[dateStr].length > 0) {
-                    html += '<div class="schedule-list">';
-                    schedule[dateStr].forEach(item => {
-                        const shift = shifts.find(s => s.id === item.shiftId);
-                        const color = shift ? shift.color : '#999';
-                        const shiftName = shift ? shift.name : (item.shiftName || item.shiftId);
-                        const isLeave = shift && shift.isLeave;
-                        const note = item.note ? `（${item.note}）` : '';
-                        
-                        html += '<div class="schedule-item-full" style="background: ' + color + ';">';
-                        
-                        if (isLeave) {
-                            const leaveIcon = shift.leaveType === '病假' ? '🏥' : shift.leaveType === '事假' ? '📝' : shift.leaveType === '特休' ? '🌴' : '🎉';
-                            const leaveHours = item.leaveHours || 8;
-                            html += '<div>' + item.staffName + ' ' + leaveIcon + shiftName + note + '</div>';
-                            html += '<div class="time">' + leaveHours + '小時</div>';
-                        } else {
-                            // ✅ 位置 1：修改后的代码
-                            // 一般班別：計算工時
-                            let workInfo;
-                            let displayTime = '';  // 🆕 新增：统一的时间显示变量
-                            
-                            if (shift && shift.time) {
-                                // 有找到班別且有時間
-                                workInfo = calculateWorkHours(shift.time);
-                                displayTime = shift.time;  // 🆕 记录时间
-                            } else if (item.shiftTime) {
-                                // 🆕 优先使用数据库中的 shiftTime
-                                workInfo = calculateWorkHours(item.shiftTime);
-                                displayTime = item.shiftTime;  // 🆕 记录时间
-                            } else if (item.shiftName) {
-                                // 🆕 改进：从任何 shiftName 中尝试提取时间
-                                const timeMatch = item.shiftName.match(/(\d{1,2}:\d{2})-(\d{1,2}:\d{2})/);
-                                if (timeMatch) {
-                                    const extractedTime = timeMatch[0];
-                                    workInfo = calculateWorkHours(extractedTime);
-                                    displayTime = extractedTime;  // 🆕 记录时间
-                                } else {
-                                    workInfo = { rawHours: 0, breakMinutes: 0, netHours: 0 };
-                                }
-                            } else {
-                                workInfo = { rawHours: 0, breakMinutes: 0, netHours: 0 };
-                            }
-                            
-                            // 計算加班時數（只計算已審核的）
-                            let overtime = 0;
-                            if (item.overtimeStart && item.overtimeEnd && item.overtimeStatus === '已審核') {
-                                overtime = calculateOvertimeHours(item.overtimeStart, item.overtimeEnd);
-                            }
-                        
-                            let appliedLeaveHours = 0;
-                            if (item.leaveType && item.leaveHours && item.leaveHours > 0) {
-                                appliedLeaveHours = Number(item.leaveHours) || 0;
-                            }
-                            
-                            let overtimeDisplay = '';
-                            if (item.overtimeStart && item.overtimeEnd && item.overtimeStatus === '已審核') {
-                                const otHours = calculateOvertimeHours(item.overtimeStart, item.overtimeEnd);
-                                overtimeDisplay = ` <span style="color:#10b981;">+${otHours}h✓</span>`;
-                            } else if (item.overtimeStart && item.overtimeEnd) {
-                                const otHours = calculateOvertimeHours(item.overtimeStart, item.overtimeEnd);
-                                overtimeDisplay = ` <span style="color:#f59e0b;">+${otHours}h⏳</span>`;
-                            }
-                            
-                            let leaveDisplay = '';
-                            if (item.leaveType && item.leaveHours && item.leaveHours > 0) {
-                                const leaveIcon = item.leaveType === '病假' ? '🏥' : item.leaveType === '事假' ? '📝' : item.leaveType === '特休' ? '🌴' : item.leaveType === '補休' ? '🔄' : '🎉';
-                                leaveDisplay = ` <span style="color:#9ca3af;">${leaveIcon}-${item.leaveHours}h</span>`;
-                            }
-                            
-                            // 🆕 改进的时间显示逻辑
-                            const timeHtml = displayTime ? '<div class="time">' + displayTime + '</div>' : '';
-                            html += '<div>' + item.staffName + ' ' + shiftName + note + overtimeDisplay + leaveDisplay + '</div>';
-                            html += timeHtml;
-                        }
-                        
-                        html += '</div>';
-                    });
-                    html += '</div>';
+    html += '<div class="schedule-list">';
+    schedule[dateStr].forEach(item => {
+        const shift = shifts.find(s => s.id === item.shiftId);
+        const color = shift ? shift.color : '#999';
+        const shiftName = shift ? shift.name : (item.shiftName || item.shiftId);
+        const isLeave = shift && shift.isLeave;
+        const note = item.note ? `（${item.note}）` : '';
+        
+        html += '<div class="schedule-item-full" style="background: ' + color + ';">';
+        
+        if (isLeave) {
+            // 假別顯示
+            const leaveIcon = shift.leaveType === '病假' ? '🏥' : shift.leaveType === '事假' ? '📝' : shift.leaveType === '特休' ? '🌴' : '🎉';
+            const leaveHours = item.leaveHours || 8;
+            html += '<div>' + item.staffName + ' ' + leaveIcon + shiftName + note + '</div>';
+            html += '<div class="time">' + leaveHours + '小時</div>';
+        } else {
+            // ✅ 一般班別：計算工時和顯示時段
+            let workInfo;
+            let displayTime = '';  // 🆕 統一的時間顯示變數
+            
+            // 🆕 優先順序：shift.time > item.shiftTime > 從 shiftName 解析
+            if (shift && shift.time) {
+                workInfo = calculateWorkHours(shift.time);
+                displayTime = shift.time;
+            } else if (item.shiftTime) {
+                workInfo = calculateWorkHours(item.shiftTime);
+                displayTime = item.shiftTime;
+            } else if (item.shiftName) {
+                const timeMatch = item.shiftName.match(/(\d{1,2}:\d{2})-(\d{1,2}:\d{2})/);
+                if (timeMatch) {
+                    const extractedTime = timeMatch[0];
+                    workInfo = calculateWorkHours(extractedTime);
+                    displayTime = extractedTime;
+                } else {
+                    workInfo = { rawHours: 0, breakMinutes: 0, netHours: 0 };
                 }
-                html += '</div>';
+            } else {
+                workInfo = { rawHours: 0, breakMinutes: 0, netHours: 0 };
             }
+            
+            // 計算加班時數（只計算已審核的）
+            let overtime = 0;
+            if (item.overtimeStart && item.overtimeEnd && item.overtimeStatus === '已審核') {
+                overtime = calculateOvertimeHours(item.overtimeStart, item.overtimeEnd);
+            }
+        
+            let appliedLeaveHours = 0;
+            if (item.leaveType && item.leaveHours && item.leaveHours > 0) {
+                appliedLeaveHours = Number(item.leaveHours) || 0;
+            }
+            
+            let overtimeDisplay = '';
+            if (item.overtimeStart && item.overtimeEnd && item.overtimeStatus === '已審核') {
+                const otHours = calculateOvertimeHours(item.overtimeStart, item.overtimeEnd);
+                overtimeDisplay = ` <span style="color:#10b981;">+${otHours}h✓</span>`;
+            } else if (item.overtimeStart && item.overtimeEnd) {
+                const otHours = calculateOvertimeHours(item.overtimeStart, item.overtimeEnd);
+                overtimeDisplay = ` <span style="color:#f59e0b;">+${otHours}h⏳</span>`;
+            }
+            
+            let leaveDisplay = '';
+            if (item.leaveType && item.leaveHours && item.leaveHours > 0) {
+                const leaveIcon = item.leaveType === '病假' ? '🏥' : item.leaveType === '事假' ? '📝' : item.leaveType === '特休' ? '🌴' : item.leaveType === '補休' ? '🔄' : '🎉';
+                leaveDisplay = ` <span style="color:#9ca3af;">${leaveIcon}-${item.leaveHours}h</span>`;
+            }
+            
+            // 🆕 顯示員工、班別、備註、加班、請假
+            html += '<div>' + item.staffName + ' ' + shiftName + note + overtimeDisplay + leaveDisplay + '</div>';
+            
+            // 🆕 顯示時段（如果有的話）
+            if (displayTime) {
+                html += '<div class="time">' + displayTime + '</div>';
+            }
+        }
+        
+        html += '</div>';
+    });
+    html += '</div>';
+}
             
             const remainingDays = (7 - (startDay + lastDay.getDate()) % 7) % 7;
             for (let day = 1; day <= remainingDays; day++) html += `<div class="day-cell other-month"><div class="day-number">${day}</div></div>`;
