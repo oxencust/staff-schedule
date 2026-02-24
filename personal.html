@@ -1542,22 +1542,51 @@
             }
 
             if (mySchedule && isCurrentMonth) {
-                const shift = shifts.find(s => s.id === mySchedule.shiftId);
-                let shiftName = shift ? shift.name : mySchedule.shiftName || mySchedule.shiftId;
-                let shiftColor = shift ? shift.color : '#4b5563';
-                
-                if (mySchedule.shiftId && mySchedule.shiftId.startsWith('custom_')) {
-                    const timeMatch = mySchedule.shiftName ? mySchedule.shiftName.match(/(\d{2}:\d{2})-(\d{2}:\d{2})/) : null;
-                    if (timeMatch) {
-                        shiftName = timeMatch[0];
-                        shiftColor = '#a78bfa';
-                    }
-                }
+    const shift = shifts.find(s => s.id === mySchedule.shiftId);
+    
+    // 🆕 三層降級邏輯取得班別名稱和時間
+    let shiftName = '';
+    let shiftTime = '';
+    let shiftColor = '#4b5563';
+    
+    if (shift) {
+        // 1. 班別存在：使用班別設定
+        shiftName = shift.name;
+        shiftTime = shift.time;
+        shiftColor = shift.color;
+    } else if (mySchedule.shiftTime) {
+        // 2. 班別已刪除，但有 shiftTime：使用資料庫的時間
+        shiftName = mySchedule.shiftName || mySchedule.shiftId;
+        shiftTime = mySchedule.shiftTime;
+    } else if (mySchedule.shiftName) {
+        // 3. 從 shiftName 解析時間
+        const timeMatch = mySchedule.shiftName.match(/(\d{1,2}:\d{2})-(\d{1,2}:\d{2})/);
+        if (timeMatch) {
+            shiftTime = timeMatch[0];
+            shiftName = mySchedule.shiftName;
+        } else {
+            shiftName = mySchedule.shiftName;
+        }
+    } else {
+        shiftName = mySchedule.shiftId;
+    }
+    
+    // 自訂班別用紫色
+    if (mySchedule.shiftId && mySchedule.shiftId.startsWith('custom_')) {
+        shiftColor = '#a78bfa';
+    }
                 
                 html += '<div style="margin-top: 4px; padding-top: 4px; border-top: 1px dashed #ddd;">';
-                html += '<div style="font-size: 9px; color: #666; margin-bottom: 2px;">已排班：</div>';
-                html += `<div class="shift-badges">`;
-                html += `<span class="shift-badge" style="background: ${shiftColor}; color: white;">${shiftName}</span>`;
+html += '<div style="font-size: 9px; color: #666; margin-bottom: 2px;">已排班：</div>';
+html += `<div class="shift-badges">`;
+
+// 🆕 顯示班別名稱和時間
+if (shiftTime) {
+    html += `<span class="shift-badge" style="background: ${shiftColor}; color: white;">${shiftName}</span>`;
+    html += `<span class="shift-badge" style="background: #6b7280; color: white;">${shiftTime}</span>`;
+} else {
+    html += `<span class="shift-badge" style="background: ${shiftColor}; color: white;">${shiftName}</span>`;
+}
                 
                 if (mySchedule.overtimeStart && mySchedule.overtimeEnd) {
                     const otStatus = mySchedule.overtimeStatus === '已審核' ? '✓' : '⏳';
