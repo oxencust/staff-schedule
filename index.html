@@ -1315,37 +1315,44 @@
                             html += '<div>' + item.staffName + ' ' + leaveIcon + shiftName + note + '</div>';
                             html += '<div class="time">' + leaveHours + '小時</div>';
                         } else {
-    // 一般班別：計算工時
-    let workInfo;
-    
-    if (shift && shift.time) {
-    workInfo = calculateWorkHours(shift.time);
-} else if (item.shiftTime) {
-    workInfo = calculateWorkHours(item.shiftTime);
-} else if (item.shiftName && item.shiftName.startsWith('自訂')) {
-        // 自訂班別：從 shiftName 解析時間
-        const timeMatch = item.shiftName.match(/(\d{2}:\d{2})-(\d{2}:\d{2})/);
-        if (timeMatch) {
-            const customTime = timeMatch[0]; // 例如：14:00-20:00
-            workInfo = calculateWorkHours(customTime);
-        } else {
-            workInfo = { rawHours: 0, breakMinutes: 0, netHours: 0 };
-        }
-    } else {
-        workInfo = { rawHours: 0, breakMinutes: 0, netHours: 0 };
-    }
-    
-    // 計算加班時數（只計算已審核的）
-    let overtime = 0;
-    if (item.overtimeStart && item.overtimeEnd && item.overtimeStatus === '已審核') {
-        overtime = calculateOvertimeHours(item.overtimeStart, item.overtimeEnd);
-    }
+                            // ✅ 位置 1：修改后的代码
+                            // 一般班別：計算工時
+                            let workInfo;
+                            let displayTime = '';  // 🆕 新增：统一的时间显示变量
+                            
+                            if (shift && shift.time) {
+                                // 有找到班別且有時間
+                                workInfo = calculateWorkHours(shift.time);
+                                displayTime = shift.time;  // 🆕 记录时间
+                            } else if (item.shiftTime) {
+                                // 🆕 优先使用数据库中的 shiftTime
+                                workInfo = calculateWorkHours(item.shiftTime);
+                                displayTime = item.shiftTime;  // 🆕 记录时间
+                            } else if (item.shiftName) {
+                                // 🆕 改进：从任何 shiftName 中尝试提取时间
+                                const timeMatch = item.shiftName.match(/(\d{1,2}:\d{2})-(\d{1,2}:\d{2})/);
+                                if (timeMatch) {
+                                    const extractedTime = timeMatch[0];
+                                    workInfo = calculateWorkHours(extractedTime);
+                                    displayTime = extractedTime;  // 🆕 记录时间
+                                } else {
+                                    workInfo = { rawHours: 0, breakMinutes: 0, netHours: 0 };
+                                }
+                            } else {
+                                workInfo = { rawHours: 0, breakMinutes: 0, netHours: 0 };
+                            }
+                            
+                            // 計算加班時數（只計算已審核的）
+                            let overtime = 0;
+                            if (item.overtimeStart && item.overtimeEnd && item.overtimeStatus === '已審核') {
+                                overtime = calculateOvertimeHours(item.overtimeStart, item.overtimeEnd);
+                            }
                         
-                        let appliedLeaveHours = 0;
-                        if (item.leaveType && item.leaveHours && item.leaveHours > 0) {
-                            appliedLeaveHours = Number(item.leaveHours) || 0;
-                        }
-                        
+                            let appliedLeaveHours = 0;
+                            if (item.leaveType && item.leaveHours && item.leaveHours > 0) {
+                                appliedLeaveHours = Number(item.leaveHours) || 0;
+                            }
+                            
                             let overtimeDisplay = '';
                             if (item.overtimeStart && item.overtimeEnd && item.overtimeStatus === '已審核') {
                                 const otHours = calculateOvertimeHours(item.overtimeStart, item.overtimeEnd);
@@ -1361,7 +1368,8 @@
                                 leaveDisplay = ` <span style="color:#9ca3af;">${leaveIcon}-${item.leaveHours}h</span>`;
                             }
                             
-                            const timeHtml = (shift && shift.time) ? '<div class="time">' + shift.time + '</div>' : (item.shiftTime ? '<div class="time">' + item.shiftTime + '</div>' : '');
+                            // 🆕 改进的时间显示逻辑
+                            const timeHtml = displayTime ? '<div class="time">' + displayTime + '</div>' : '';
                             html += '<div>' + item.staffName + ' ' + shiftName + note + overtimeDisplay + leaveDisplay + '</div>';
                             html += timeHtml;
                         }
@@ -1468,31 +1476,34 @@
                         stats[item.staffName].leaveHours += leaveHours;
                         stats[item.staffName].days += 1;
                     } else {
-    // 一般班別：計算工時
-    let workInfo;
-    
-    if (shift && shift.time) {
-    workInfo = calculateWorkHours(shift.time);
-} else if (item.shiftTime) {
-    workInfo = calculateWorkHours(item.shiftTime);
-} else if (item.shiftName && item.shiftName.startsWith('自訂')) {
-        // 自訂班別：從 shiftName 解析時間
-        const timeMatch = item.shiftName.match(/(\d{2}:\d{2})-(\d{2}:\d{2})/);
-        if (timeMatch) {
-            const customTime = timeMatch[0]; // 例如：14:00-20:00
-            workInfo = calculateWorkHours(customTime);
-        } else {
-            workInfo = { rawHours: 0, breakMinutes: 0, netHours: 0 };
-        }
-    } else {
-        workInfo = { rawHours: 0, breakMinutes: 0, netHours: 0 };
-    }
-    
-    // 計算加班時數（只計算已審核的）
-    let overtime = 0;
-    if (item.overtimeStart && item.overtimeEnd && item.overtimeStatus === '已審核') {
-        overtime = calculateOvertimeHours(item.overtimeStart, item.overtimeEnd);
-    }
+                        // ✅ 位置 2：修改后的代码
+                        // 一般班別：計算工時
+                        let workInfo;
+                        
+                        if (shift && shift.time) {
+                            // 有找到班別且有時間
+                            workInfo = calculateWorkHours(shift.time);
+                        } else if (item.shiftTime) {
+                            // 🆕 优先使用数据库中的 shiftTime
+                            workInfo = calculateWorkHours(item.shiftTime);
+                        } else if (item.shiftName) {
+                            // 🆕 改进：从任何 shiftName 中尝试提取时间
+                            const timeMatch = item.shiftName.match(/(\d{1,2}:\d{2})-(\d{1,2}:\d{2})/);
+                            if (timeMatch) {
+                                const extractedTime = timeMatch[0];
+                                workInfo = calculateWorkHours(extractedTime);
+                            } else {
+                                workInfo = { rawHours: 0, breakMinutes: 0, netHours: 0 };
+                            }
+                        } else {
+                            workInfo = { rawHours: 0, breakMinutes: 0, netHours: 0 };
+                        }
+                        
+                        // 計算加班時數（只計算已審核的）
+                        let overtime = 0;
+                        if (item.overtimeStart && item.overtimeEnd && item.overtimeStatus === '已審核') {
+                            overtime = calculateOvertimeHours(item.overtimeStart, item.overtimeEnd);
+                        }
                         
                         let appliedLeaveHours = 0;
                         if (item.leaveType && item.leaveHours && item.leaveHours > 0) {
@@ -1992,81 +2003,81 @@
         }
 
         async function exportSchedule() {
-    if (!API_URL) { showToast('請先設定 API'); return; }
-    
-    const d = {};
-    const lastDay = new Date(currentYear, currentMonth + 1, 0);
-    
-    for (let day = 1; day <= lastDay.getDate(); day++) {
-        const date = new Date(currentYear, currentMonth, day);
-        const dateStr = formatDate(date);
-        const daySchedule = schedule[dateStr] || [];
-        
-        if (daySchedule.length > 0) {
-            d[day] = daySchedule.map(item => {
-                // 🆕 計算加班時數（只計算已審核的）
-                let overtimeHours = 0;
-                if (item.overtimeStart && item.overtimeEnd && item.overtimeStatus === '已審核') {
-                    overtimeHours = calculateOvertimeHours(item.overtimeStart, item.overtimeEnd);
-                }
+            if (!API_URL) { showToast('請先設定 API'); return; }
+            
+            const d = {};
+            const lastDay = new Date(currentYear, currentMonth + 1, 0);
+            
+            for (let day = 1; day <= lastDay.getDate(); day++) {
+                const date = new Date(currentYear, currentMonth, day);
+                const dateStr = formatDate(date);
+                const daySchedule = schedule[dateStr] || [];
                 
-                return [
-                    item.staffName,
-                    item.shiftId,
-                    overtimeHours,  // ← 使用計算後的時數
-                    item.note || '',
-                    item.leaveHours || 0,
-                    item.shiftName || ''
-                ];
-            });
+                if (daySchedule.length > 0) {
+                    d[day] = daySchedule.map(item => {
+                        // 🆕 計算加班時數（只計算已審核的）
+                        let overtimeHours = 0;
+                        if (item.overtimeStart && item.overtimeEnd && item.overtimeStatus === '已審核') {
+                            overtimeHours = calculateOvertimeHours(item.overtimeStart, item.overtimeEnd);
+                        }
+                        
+                        return [
+                            item.staffName,
+                            item.shiftId,
+                            overtimeHours,  // ← 使用計算後的時數
+                            item.note || '',
+                            item.leaveHours || 0,
+                            item.shiftName || ''
+                        ];
+                    });
+                }
+            }
+            
+            if (Object.keys(d).length === 0) { 
+                showToast('沒有排班資料'); 
+                return; 
+            }
+            
+            const monthStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
+            const h = holidays.filter(x => x.date.startsWith(monthStr)).map(x => parseInt(x.date.split('-')[2]));
+            
+            const staffStats = {};
+            staffList.forEach(s => { staffStats[s.name] = 0; });
+            for (const dateStr in schedule) {
+                if (dateStr.startsWith(monthStr)) {
+                    schedule[dateStr].forEach(item => {
+                        staffStats[item.staffName] = (staffStats[item.staffName] || 0) + 1;
+                    });
+                }
+            }
+            const sortedStaffNames = staffList
+                .sort((a, b) => (staffStats[b.name] || 0) - (staffStats[a.name] || 0))
+                .map(s => s.name);
+            
+            showToast('📤 匯出中...');
+            
+            try {
+                const payload = {
+                    action: 'exportSchedule',
+                    y: currentYear,
+                    m: currentMonth + 1,
+                    d: d,
+                    h: h,
+                    s: sortedStaffNames
+                };
+                
+                const res = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                showToast(data.success ? '✅ ' + data.message : '❌ 匯出失敗：' + (data.error || ''));
+            } catch (e) { 
+                console.error('匯出失敗', e);
+                showToast('❌ 匯出失敗：' + e.message); 
+            }
         }
-    }
-    
-    if (Object.keys(d).length === 0) { 
-        showToast('沒有排班資料'); 
-        return; 
-    }
-    
-    const monthStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
-    const h = holidays.filter(x => x.date.startsWith(monthStr)).map(x => parseInt(x.date.split('-')[2]));
-    
-    const staffStats = {};
-    staffList.forEach(s => { staffStats[s.name] = 0; });
-    for (const dateStr in schedule) {
-        if (dateStr.startsWith(monthStr)) {
-            schedule[dateStr].forEach(item => {
-                staffStats[item.staffName] = (staffStats[item.staffName] || 0) + 1;
-            });
-        }
-    }
-    const sortedStaffNames = staffList
-        .sort((a, b) => (staffStats[b.name] || 0) - (staffStats[a.name] || 0))
-        .map(s => s.name);
-    
-    showToast('📤 匯出中...');
-    
-    try {
-        const payload = {
-            action: 'exportSchedule',
-            y: currentYear,
-            m: currentMonth + 1,
-            d: d,
-            h: h,
-            s: sortedStaffNames
-        };
-        
-        const res = await fetch(API_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'text/plain' },
-            body: JSON.stringify(payload)
-        });
-        const data = await res.json();
-        showToast(data.success ? '✅ ' + data.message : '❌ 匯出失敗：' + (data.error || ''));
-    } catch (e) { 
-        console.error('匯出失敗', e);
-        showToast('❌ 匯出失敗：' + e.message); 
-    }
-}
 
         async function prevMonth() { 
             showToast('⏳ 載入中...');
