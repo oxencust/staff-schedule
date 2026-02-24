@@ -1626,7 +1626,7 @@ if (shiftTime) {
             fragment.appendChild(allDayDiv);
             
             // 班別選項
-            shifts.filter(shift => !shift.isLeave).forEach(shift => {
+            shifts.filter(shift => !shift.isLeave && !shift.disabled).forEach(shift => {
     const shiftDiv = document.createElement('div');
     shiftDiv.className = 'shift-option';
     shiftDiv.id = `shift_${shift.id}_option`;
