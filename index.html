@@ -1379,6 +1379,8 @@
     });
     html += '</div>';
 }
+                html += '</div>';  // ✅ 加上這一行！閉合 day-cell
+    }
             
             const remainingDays = (7 - (startDay + lastDay.getDate()) % 7) % 7;
             for (let day = 1; day <= remainingDays; day++) html += `<div class="day-cell other-month"><div class="day-number">${day}</div></div>`;
