@@ -1437,7 +1437,7 @@
             }
         }
         
-        function updateStats() {
+        async function updateStats() {
             const statsGrid = document.getElementById('statsGrid');
             if (!statsGrid) return;
             
@@ -1455,6 +1455,8 @@
                     staffType, requiredHours
                 };
             });
+            
+            await calculateAccumulatedDiff(stats);
             
             for (const dateStr in schedule) {
                 if (!dateStr.startsWith(monthStr)) continue;
@@ -1557,21 +1559,31 @@
                     }
                     
                     let diffHtml = '';
-                    if (s.requiredHours !== null) {
-                        const actualHours = totalHours + s.leaveHours;
-                        const diff = actualHours - s.requiredHours;
-                        const diffColor = diff >= 0 ? '#10b981' : '#ef4444';
-                        const diffText = diff >= 0 ? `+${diff.toFixed(1)}（可補休）` : `${diff.toFixed(1)}（需補班）`;
-                        diffHtml = `
-                            <div class="stats-row" style="background: ${diff >= 0 ? '#ecfdf5' : '#fef2f2'}; margin: 6px -10px; padding: 8px 10px; border-radius: 4px;">
-                                <span class="stats-label">應排時數</span>
-                                <span class="stats-value">${s.requiredHours} 小時</span>
-                            </div>
-                            <div class="stats-row">
-                                <span class="stats-label" style="font-weight:600;">差異</span>
-                                <span class="stats-value" style="color: ${diffColor}; font-weight: 700;">${diffText}</span>
-                            </div>`;
-                    }
+if (s.requiredHours !== null) {
+    const actualHours = totalHours + s.leaveHours;
+    const diff = actualHours - s.requiredHours;
+    const diffColor = diff >= 0 ? '#10b981' : '#ef4444';
+    const diffText = diff >= 0 ? `+${diff.toFixed(1)}（可補休）` : `${diff.toFixed(1)}（需補班）`;
+    
+    // 🆕 計算累計差異
+    const accumulatedDiff = (s.accumulatedCompensatory || 0) + diff;
+    const accDiffColor = accumulatedDiff > 0 ? '#10b981' : (accumulatedDiff < 0 ? '#ef4444' : '#6b7280');
+    const accDiffSign = accumulatedDiff > 0 ? '+' : '';
+    
+    diffHtml = `
+        <div class="stats-row" style="background: ${diff >= 0 ? '#ecfdf5' : '#fef2f2'}; margin: 6px -10px; padding: 8px 10px; border-radius: 4px;">
+            <span class="stats-label">應排時數</span>
+            <span class="stats-value">${s.requiredHours} 小時</span>
+        </div>
+        <div class="stats-row">
+            <span class="stats-label" style="font-weight:600;">本月差異</span>
+            <span class="stats-value" style="color: ${diffColor}; font-weight: 700;">${diffText}</span>
+        </div>
+        <div class="stats-row" style="background: #f3f4f6; margin: 6px -10px; padding: 8px 10px; border-radius: 4px;">
+            <span class="stats-label" style="font-weight:600;">累計差異</span>
+            <span class="stats-value" style="color: ${accDiffColor}; font-weight: 700; font-size: 16px;">${accDiffSign}${accumulatedDiff.toFixed(1)} 小時</span>
+        </div>`;
+}
                     
                     const typeColor = s.staffType === '正職' ? '#10b981' : s.staffType === '半薪正職' ? '#3b82f6' : '#9ca3af';
                     const typeBadge = `<span style="font-size:10px;padding:2px 6px;border-radius:3px;background:${typeColor};color:white;margin-left:8px;">${s.staffType}</span>`;
@@ -1621,6 +1633,57 @@
             
             statsGrid.innerHTML = html;
         }
+
+        /**
+ * 🆕 計算累計差異（補休、加班等）
+ */
+async function calculateAccumulatedDiff(currentStats) {
+    if (!API_URL) return;
+    
+    try {
+        // 獲取當前月份之前的所有月份統計
+        const currentDate = new Date(currentYear, currentMonth, 1);
+        let accumulated = {};
+        
+        // 往前推12個月
+        for (let i = 1; i <= 12; i++) {
+            const checkDate = new Date(currentYear, currentMonth - i, 1);
+            const checkYear = checkDate.getFullYear();
+            const checkMonth = checkDate.getMonth() + 1;
+            const monthStr = `${checkYear}-${String(checkMonth).padStart(2, '0')}`;
+            
+            // 從 API 獲取歷史統計
+            const res = await fetch(`${API_URL}?action=getMonthStats&month=${monthStr}`);
+            const data = await res.json();
+            
+            if (data.success && data.stats) {
+                // 累計每個員工的差異
+                for (const staffName in data.stats) {
+                    if (!accumulated[staffName]) {
+                        accumulated[staffName] = {
+                            compensatoryDays: 0,
+                            overtimeDays: 0
+                        };
+                    }
+                    
+                    const stat = data.stats[staffName];
+                    // 累計補休/加班差異（以小時為單位）
+                    accumulated[staffName].compensatoryDays += (stat.hoursDiff || 0);
+                }
+            }
+        }
+        
+        // 🆕 將累計值加到當前統計中
+        for (const staffName in currentStats) {
+            if (accumulated[staffName]) {
+                currentStats[staffName].accumulatedCompensatory = accumulated[staffName].compensatoryDays;
+            }
+        }
+        
+    } catch (e) {
+        console.error('計算累計差異失敗:', e);
+    }
+}
 
         function renderShiftDots(shiftInfo) {
             if (shiftInfo === '整天') return shifts.map(s => `<span class="shift-dot" style="background:${s.color};" title="${s.name}"></span>`).join('');
