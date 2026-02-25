@@ -438,6 +438,36 @@
             .month-btn:hover { background: var(--pink); }
             .btn:hover { filter: none; }
         }
+
+        /* 🆕 統計區域樣式 */
+        .stats-panel {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        .stats-panel h3 {
+            font-size: 16px;
+            margin-bottom: 15px;
+            color: var(--green-dark);
+        }
+        .stats-card .stats-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+            padding: 4px 0;
+        }
+        .stats-card .stats-label {
+            color: #666;
+        }
+        .stats-card .stats-value {
+            font-weight: 600;
+            color: #333;
+        }
+        .stats-card .stats-value.highlight {
+            color: var(--green);
+            font-size: 15px;
+        }
     </style>
 </head>
 <body>
@@ -588,6 +618,26 @@
             </div>
         </div>
     </div>
+
+    <!-- 🆕 統計區域 -->
+            <div class="stats-panel" style="margin-top: 20px;">
+                <h3>📊 本月統計</h3>
+                <div class="stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 15px;">
+                    <!-- 統計卡片 1：我的可上班時段 -->
+                    <div id="myAvailabilityStats" class="stats-card" style="background: #f0f9ff; border-left: 4px solid #3b82f6; border-radius: 10px; padding: 15px;">
+                        <div class="staff-name" style="font-weight: 700; font-size: 16px; color: #1e40af; margin-bottom: 10px;">📝 我填寫的可上班時段</div>
+                        <div style="font-size: 12px; color: #666; margin-bottom: 8px;">（我勾選想上班的時段統計）</div>
+                        <div id="myAvailabilityStatsContent"></div>
+                    </div>
+
+                    <!-- 統計卡片 2：管理端實際排班 -->
+                    <div id="actualScheduleStats" class="stats-card" style="background: #f0fdf4; border-left: 4px solid #10b981; border-radius: 10px; padding: 15px;">
+                        <div class="staff-name" style="font-weight: 700; font-size: 16px; color: #047857; margin-bottom: 10px;">📅 管理端實際排班</div>
+                        <div style="font-size: 12px; color: #666; margin-bottom: 8px;">（管理員實際排給我的班）</div>
+                        <div id="actualScheduleStatsContent"></div>
+                    </div>
+                </div>
+            </div>
 
     <!-- 請假申請 Modal -->
     <div class="modal-overlay" id="leaveModal">
@@ -1468,6 +1518,9 @@
             }
             
             body.appendChild(fragment);  // ← 只觸發 1 次 reflow
+
+            // 🆕 更新統計
+    updateStats();
         }
 
         function createDayCell(date) {
@@ -1818,7 +1871,7 @@
             return (endMinutes - startMinutes) / 60;
         }
 
-        function updateStats() {
+        async function updateStats() {
             const lastDay = new Date(currentYear, currentMonth + 1, 0);
             let workDays = 0, holidayCount = 0, availableCount = 0, totalHours = 0;
             
@@ -1869,6 +1922,12 @@
             document.getElementById('availableHours').textContent = totalHours;
             document.getElementById('holidayCount').textContent = holidayCount;
             document.getElementById('unmarkedCount').textContent = workDays - availableCount;
+            
+            // 🆕 同時更新詳細統計
+            await Promise.all([
+                updateMyAvailabilityStats(),
+                updateActualScheduleStats()
+            ]);
         }
 
         async function previousMonth() {
@@ -2086,6 +2145,405 @@
             toast.textContent = message;
             toast.classList.add('show');
             setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+        // ============ 🆕 統計功能 ============
+        
+        /**
+         * 統計 1：我填寫的可上班時段
+         */
+        /**
+ * 統計 1：我填寫的可上班時段
+ */
+async function updateMyAvailabilityStats() {
+    const container = document.getElementById('myAvailabilityStatsContent');
+    
+    // 🆕 修正：使用 availableDates 而不是 myAvailability
+    const monthStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
+    
+    // 從 availableDates 篩選出本月的資料
+    const currentMonthDates = Object.keys(availableDates)
+        .filter(dateStr => dateStr.startsWith(monthStr))
+        .filter(dateStr => {
+            const data = availableDates[dateStr];
+            return data && (data.allDay || (data.shifts && data.shifts.length > 0) || data.customTime);
+        });
+    
+    if (currentMonthDates.length === 0) {
+        container.innerHTML = '<div style="color:#999;font-size:13px;">尚未填寫可上班時段</div>';
+        return;
+    }
+    
+    let totalDays = 0;
+    let totalRawHours = 0;
+    let totalBreakMinutes = 0;
+    let totalNetHours = 0;
+    let break30 = 0, break60 = 0;
+    const shiftCounts = {};
+    
+    currentMonthDates.forEach(dateStr => {
+        const data = availableDates[dateStr];
+        totalDays++;
+        
+        if (data.allDay) {
+            // 整天：假設 8 小時工時
+            totalRawHours += 8;
+            totalNetHours += 8;
+            shiftCounts['整天'] = (shiftCounts['整天'] || 0) + 1;
+        } else {
+            // 計算所選班別的總時數
+            let dayRawHours = 0;
+            let dayBreakMinutes = 0;
+            
+            if (data.shifts && data.shifts.length > 0) {
+                data.shifts.forEach(shiftId => {
+                    const shift = shifts.find(s => s.id === shiftId);
+                    if (shift && shift.time) {
+                        const workInfo = calculateWorkHours(shift.time);
+                        dayRawHours += workInfo.rawHours;
+                        dayBreakMinutes += workInfo.breakMinutes;
+                        if (workInfo.breakMinutes === 30) break30++;
+                        if (workInfo.breakMinutes === 60) break60++;
+                        shiftCounts[shift.name] = (shiftCounts[shift.name] || 0) + 1;
+                    }
+                });
+            }
+            
+            if (data.customTime) {
+                const workInfo = calculateWorkHours(data.customTime);
+                dayRawHours += workInfo.rawHours;
+                dayBreakMinutes += workInfo.breakMinutes;
+                if (workInfo.breakMinutes === 30) break30++;
+                if (workInfo.breakMinutes === 60) break60++;
+                shiftCounts['自訂時段'] = (shiftCounts['自訂時段'] || 0) + 1;
+            }
+            
+            totalRawHours += dayRawHours;
+            totalBreakMinutes += dayBreakMinutes;
+            totalNetHours += (dayRawHours - dayBreakMinutes / 60);
+        }
+    });
+    
+    const breakHours = totalBreakMinutes / 60;
+    const shiftSummary = Object.entries(shiftCounts).map(([k, v]) => `${k}×${v}`).join('、');
+    
+    let breakDetail = '';
+    if (break30 > 0 || break60 > 0) {
+        const parts = [];
+        if (break30 > 0) parts.push(`30分×${break30}`);
+        if (break60 > 0) parts.push(`60分×${break60}`);
+        breakDetail = ` (${parts.join('、')})`;
+    }
+    
+    let html = `
+        <div class="stats-row">
+            <span class="stats-label">可上班天數</span>
+            <span class="stats-value highlight">${totalDays} 天</span>
+        </div>
+        <div class="stats-row">
+            <span class="stats-label">班別時長</span>
+            <span class="stats-value">${totalRawHours.toFixed(1)} 小時</span>
+        </div>
+        <div class="stats-row">
+            <span class="stats-label">休息時間</span>
+            <span class="stats-value" style="color: #f59e0b;">-${breakHours.toFixed(1)} 小時</span>
+        </div>`;
+    
+    if (breakDetail) {
+        html += `<div class="stats-row">
+            <span class="stats-label" style="font-size: 11px; color: #999;">休息明細</span>
+            <span class="stats-value" style="font-size: 11px; color: #f59e0b;">${breakDetail}</span>
+        </div>`;
+    }
+    
+    html += `
+        <div class="stats-row">
+            <span class="stats-label">預計工時</span>
+            <span class="stats-value highlight">${totalNetHours.toFixed(1)} 小時</span>
+        </div>
+        <div class="stats-row" style="margin-top: 6px; padding-top: 6px; border-top: 1px dashed #ddd;">
+            <span class="stats-label" style="font-size: 11px;">時段明細</span>
+            <span class="stats-value" style="font-size: 11px; color: #666;">${shiftSummary || '-'}</span>
+        </div>`;
+    
+    container.innerHTML = html;
+}
+        
+        /**
+         * 統計 2：管理端實際排班
+         */
+        async function updateActualScheduleStats() {
+            const container = document.getElementById('actualScheduleStatsContent');
+            
+            if (!API_URL) {
+                container.innerHTML = '<div style="color:#999;font-size:13px;">API 未設定</div>';
+                return;
+            }
+            
+            try {
+                // 從 API 獲取本月統計
+                const monthStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
+                const res = await fetch(`${API_URL}?action=getMonthStats&month=${monthStr}`);
+                const data = await res.json();
+                
+                if (!data.success || !data.stats || !data.stats[staffName]) {
+                    container.innerHTML = '<div style="color:#999;font-size:13px;">本月尚無排班</div>';
+                    return;
+                }
+                
+                const stats = data.stats[staffName];
+                
+                // 從 API 取得詳細排班資料來計算統計
+                const schedRes = await fetch(`${API_URL}?action=getSchedules&month=${monthStr}`);
+                const schedData = await schedRes.json();
+                
+                if (!schedData.success || !schedData.schedules) {
+                    container.innerHTML = '<div style="color:#999;font-size:13px;">無法載入排班資料</div>';
+                    return;
+                }
+                
+                const schedules = schedData.schedules;
+                
+                // 計算詳細統計
+                let days = 0, rawHours = 0, breakMinutes = 0, netHours = 0, overtimeHours = 0, leaveHours = 0;
+                let break30 = 0, break60 = 0;
+                const shiftCounts = {};
+                
+                for (const dateStr in schedules) {
+                    if (!dateStr.startsWith(monthStr)) continue;
+                    
+                    const daySchedule = schedules[dateStr];
+                    const mySchedule = daySchedule.find(s => s.staffName === staffName);
+                    
+                    if (mySchedule) {
+                        days++;
+                        const shift = shifts.find(s => s.id === mySchedule.shiftId);
+                        const isLeave = shift ? shift.isLeave : false;
+                        
+                        if (isLeave) {
+                            leaveHours += mySchedule.leaveHours || 8;
+                        } else {
+                            let workInfo;
+                            if (shift && shift.time) {
+                                workInfo = calculateWorkHours(shift.time);
+                            } else if (mySchedule.shiftTime) {
+                                workInfo = calculateWorkHours(mySchedule.shiftTime);
+                            } else if (mySchedule.shiftName) {
+                                const timeMatch = mySchedule.shiftName.match(/(\d{1,2}:\d{2})-(\d{1,2}:\d{2})/);
+                                if (timeMatch) {
+                                    workInfo = calculateWorkHours(timeMatch[0]);
+                                } else {
+                                    workInfo = { rawHours: 0, breakMinutes: 0, netHours: 0 };
+                                }
+                            } else {
+                                workInfo = { rawHours: 0, breakMinutes: 0, netHours: 0 };
+                            }
+                            
+                            // 扣除請假時數
+                            let appliedLeaveHours = 0;
+                            if (mySchedule.leaveType && mySchedule.leaveHours && mySchedule.leaveHours > 0) {
+                                appliedLeaveHours = Number(mySchedule.leaveHours) || 0;
+                                leaveHours += appliedLeaveHours;
+                            }
+                            
+                            rawHours += workInfo.rawHours;
+                            breakMinutes += workInfo.breakMinutes;
+                            netHours += (workInfo.netHours - appliedLeaveHours);
+                            
+                            if (workInfo.breakMinutes === 30) break30++;
+                            if (workInfo.breakMinutes === 60) break60++;
+                            
+                            // 加班時數
+                            if (mySchedule.overtimeStart && mySchedule.overtimeEnd && mySchedule.overtimeStatus === '已審核') {
+                                overtimeHours += calculateOvertimeHours(mySchedule.overtimeStart, mySchedule.overtimeEnd);
+                            }
+                        }
+                        
+                        const shiftName = shift ? shift.name : (mySchedule.shiftName || mySchedule.shiftId);
+                        shiftCounts[shiftName] = (shiftCounts[shiftName] || 0) + 1;
+                    }
+                }
+                
+                const totalHours = netHours + overtimeHours;
+                const breakHours = breakMinutes / 60;
+                const shiftSummary = Object.entries(shiftCounts).map(([k, v]) => `${k}×${v}`).join('、');
+                
+                let breakDetail = '';
+                if (break30 > 0 || break60 > 0) {
+                    const parts = [];
+                    if (break30 > 0) parts.push(`30分×${break30}`);
+                    if (break60 > 0) parts.push(`60分×${break60}`);
+                    breakDetail = ` (${parts.join('、')})`;
+                }
+                
+                // 取得員工類型和應排時數
+                const staffInfo = await getMyStaffInfo();
+                const staffType = staffInfo ? staffInfo.staffType : 'PT';
+                const workDays = calculateWorkDays(currentYear, currentMonth + 1);
+                const requiredHours = getRequiredHours(staffType, workDays);
+                
+                let html = `
+                    <div class="stats-row">
+                        <span class="stats-label">出勤天數</span>
+                        <span class="stats-value highlight">${days} 天</span>
+                    </div>
+                    <div class="stats-row">
+                        <span class="stats-label">班別時長</span>
+                        <span class="stats-value">${rawHours.toFixed(1)} 小時</span>
+                    </div>
+                    <div class="stats-row">
+                        <span class="stats-label">休息時間</span>
+                        <span class="stats-value" style="color: #f59e0b;">-${breakHours.toFixed(1)} 小時</span>
+                    </div>`;
+                
+                if (breakDetail) {
+                    html += `<div class="stats-row">
+                        <span class="stats-label" style="font-size: 11px; color: #999;">休息明細</span>
+                        <span class="stats-value" style="font-size: 11px; color: #f59e0b;">${breakDetail}</span>
+                    </div>`;
+                }
+                
+                html += `
+                    <div class="stats-row">
+                        <span class="stats-label">實際工時</span>
+                        <span class="stats-value">${netHours.toFixed(1)} 小時</span>
+                    </div>`;
+                
+                if (overtimeHours > 0) {
+                    html += `<div class="stats-row">
+                        <span class="stats-label">加班時數</span>
+                        <span class="stats-value" style="color: #10b981;">+${overtimeHours.toFixed(1)} 小時</span>
+                    </div>`;
+                }
+                
+                if (leaveHours > 0) {
+                    html += `<div class="stats-row">
+                        <span class="stats-label">請假時數</span>
+                        <span class="stats-value" style="color: #9ca3af;">${leaveHours.toFixed(1)} 小時</span>
+                    </div>`;
+                }
+                
+                html += `
+                    <div class="stats-row" style="margin-top: 6px; padding-top: 6px; border-top: 1px solid #ddd;">
+                        <span class="stats-label">總計時數</span>
+                        <span class="stats-value highlight">${totalHours.toFixed(1)} 小時</span>
+                    </div>`;
+                
+                // 顯示應排時數和差異（只有正職/半薪正職）
+                if (requiredHours !== null) {
+                    const actualHours = totalHours + leaveHours;
+                    const diff = actualHours - requiredHours;
+                    const diffColor = diff >= 0 ? '#10b981' : '#ef4444';
+                    const diffText = diff >= 0 ? `+${diff.toFixed(1)}（可補休）` : `${diff.toFixed(1)}（需補班）`;
+                    
+                    html += `
+                        <div class="stats-row" style="background: ${diff >= 0 ? '#ecfdf5' : '#fef2f2'}; margin: 6px -10px; padding: 8px 10px; border-radius: 4px;">
+                            <span class="stats-label">應排時數</span>
+                            <span class="stats-value">${requiredHours} 小時</span>
+                        </div>
+                        <div class="stats-row">
+                            <span class="stats-label" style="font-weight:600;">本月差異</span>
+                            <span class="stats-value" style="color: ${diffColor}; font-weight: 700;">${diffText}</span>
+                        </div>`;
+                }
+                
+                html += `
+                    <div class="stats-row" style="margin-top: 6px; padding-top: 6px; border-top: 1px dashed #ddd;">
+                        <span class="stats-label" style="font-size: 11px;">班別明細</span>
+                        <span class="stats-value" style="font-size: 11px; color: #666;">${shiftSummary || '-'}</span>
+                    </div>`;
+                
+                container.innerHTML = html;
+                
+            } catch (e) {
+                console.error('載入實際排班統計失敗:', e);
+                container.innerHTML = '<div style="color:#ef4444;font-size:13px;">載入失敗</div>';
+            }
+        }
+        
+        /**
+         * 計算工時
+         */
+        function calculateWorkHours(timeStr) {
+            if (!timeStr || !timeStr.includes('-')) return { rawHours: 0, breakMinutes: 0, netHours: 0 };
+            const [start, end] = timeStr.split('-');
+            const [startH, startM] = start.split(':').map(Number);
+            const [endH, endM] = end.split(':').map(Number);
+            
+            let totalMinutes = (endH * 60 + endM) - (startH * 60 + startM);
+            if (totalMinutes < 0) totalMinutes += 24 * 60;
+            
+            const rawHours = totalMinutes / 60;
+            
+            let breakMinutes = 0;
+            if (rawHours >= 9) {
+                breakMinutes = 60;
+            } else if (rawHours > 4) {
+                breakMinutes = 30;
+            }
+            
+            const netMinutes = totalMinutes - breakMinutes;
+            const netHours = Math.max(0, netMinutes / 60);
+            
+            return { rawHours, breakMinutes, netHours };
+        }
+        
+        /**
+         * 計算加班時數
+         */
+        function calculateOvertimeHours(startTime, endTime) {
+            if (!startTime || !endTime) return 0;
+            const [startH, startM] = startTime.split(':').map(Number);
+            const [endH, endM] = endTime.split(':').map(Number);
+            const startMinutes = startH * 60 + startM;
+            const endMinutes = endH * 60 + endM;
+            const diffMinutes = endMinutes - startMinutes;
+            return Math.round(diffMinutes / 30) / 2;
+        }
+        
+        /**
+         * 計算工作日
+         */
+        function calculateWorkDays(year, month) {
+            let workDays = 0;
+            const lastDay = new Date(year, month, 0).getDate();
+            
+            for (let d = 1; d <= lastDay; d++) {
+                const date = new Date(year, month - 1, d);
+                const dayOfWeek = date.getDay();
+                if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+                    workDays++;
+                }
+            }
+            return workDays;
+        }
+        
+        /**
+         * 計算應排時數
+         */
+        function getRequiredHours(staffType, workDays) {
+            switch (staffType) {
+                case '正職': return workDays * 8;
+                case '半薪正職': return (workDays * 8) / 2;
+                case 'PT': return null;
+                default: return null;
+            }
+        }
+        
+        /**
+         * 取得自己的員工資訊
+         */
+        async function getMyStaffInfo() {
+            if (!API_URL) return null;
+            try {
+                const res = await fetch(API_URL + '?action=getStaff');
+                const data = await res.json();
+                if (data.success && data.staff) {
+                    return data.staff.find(s => s.name === staffName);
+                }
+            } catch (e) {
+                console.error('取得員工資訊失敗:', e);
+            }
+            return null;
         }
     </script>
 </body>
