@@ -1645,7 +1645,9 @@ async function calculateAccumulatedDiff(currentStats) {
         const currentDate = new Date(currentYear, currentMonth, 1);
         let accumulated = {};
         
-        // 往前推12個月
+        // 🆕 改成：往前推最多 12 個月，但遇到空資料就停止
+        let emptyMonthCount = 0;  // 連續空資料月份計數
+        
         for (let i = 1; i <= 12; i++) {
             const checkDate = new Date(currentYear, currentMonth - i, 1);
             const checkYear = checkDate.getFullYear();
@@ -1656,7 +1658,12 @@ async function calculateAccumulatedDiff(currentStats) {
             const res = await fetch(`${API_URL}?action=getMonthStats&month=${monthStr}`);
             const data = await res.json();
             
-            if (data.success && data.stats) {
+            // 🆕 檢查是否有資料
+            const hasData = data.success && data.stats && Object.keys(data.stats).length > 0;
+            
+            if (hasData) {
+                emptyMonthCount = 0;  // 重置計數
+                
                 // 累計每個員工的差異
                 for (const staffName in data.stats) {
                     if (!accumulated[staffName]) {
@@ -1669,6 +1676,14 @@ async function calculateAccumulatedDiff(currentStats) {
                     const stat = data.stats[staffName];
                     // 累計補休/加班差異（以小時為單位）
                     accumulated[staffName].compensatoryDays += (stat.hoursDiff || 0);
+                }
+            } else {
+                emptyMonthCount++;
+                
+                // 🆕 連續 2 個月沒資料就停止（避免誤判，因為可能某個月真的沒排班）
+                if (emptyMonthCount >= 2) {
+                    console.log(`⏸️ 累計差異計算停止於 ${monthStr}（連續 ${emptyMonthCount} 個月無資料）`);
+                    break;
                 }
             }
         }
