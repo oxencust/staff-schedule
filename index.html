@@ -551,6 +551,8 @@
         let schedule = {};
         let currentEditingDate = null;
         let savedMonths = [];  // ✨ 新增：追蹤已儲存的月份
+        let accumulatedDiffCache = {};
+        let lastSavedTime = {};
 
         window.onload = async function() {
             console.log('🚀 系統啟動...');
@@ -1839,11 +1841,29 @@ calculateAccumulatedDiff(stats).then(() => {
             console.log('✅ 統計更新完成（含累計差異）');
         }
         /**
- * 🆕 計算累計差異（補休、加班等）+ 月度明細
- * ⚡ 優化版：並行載入多個月份
+ * ⚡ 計算累計差異（優化版：使用快取）
  */
 async function calculateAccumulatedDiff(currentStats) {
     if (!API_URL) return;
+    
+    const currentMonthStr = getCurrentMonthStr();
+    
+    // 🆕 檢查快取是否有效
+    if (accumulatedDiffCache[currentMonthStr]) {
+        console.log('✅ 使用快取的累計差異');
+        
+        // 將快取數據加到當前統計中
+        for (const staffName in currentStats) {
+            if (accumulatedDiffCache[currentMonthStr][staffName]) {
+                currentStats[staffName].accumulatedCompensatory = accumulatedDiffCache[currentMonthStr][staffName].compensatoryDays;
+                currentStats[staffName].monthlyDetails = accumulatedDiffCache[currentMonthStr][staffName].monthlyDetails;
+            }
+        }
+        return;
+    }
+    
+    console.log('📥 計算累計差異（從 API 載入）...');
+    const startTime = Date.now();
     
     try {
         const currentDate = new Date(currentYear, currentMonth, 1);
@@ -1879,9 +1899,8 @@ async function calculateAccumulatedDiff(currentStats) {
             const hasData = data.success && data.stats && Object.keys(data.stats).length > 0;
             
             if (hasData) {
-                emptyCount = 0;  // 重置計數
+                emptyCount = 0;
                 
-                // 累計每個員工的差異
                 for (const staffName in data.stats) {
                     if (!accumulated[staffName]) {
                         accumulated[staffName] = {
@@ -1891,13 +1910,12 @@ async function calculateAccumulatedDiff(currentStats) {
                     }
                     
                     const stat = data.stats[staffName];
-                    // ✅ 重新计算确保准确（使用后端返回的详细数据）
-const overtime = Number(stat.overtime) || 0;
-const actualHours = stat.netHours + overtime + stat.leaveHours;
-const requiredHours = stat.requiredHours;
-const monthDiff = (requiredHours !== null && requiredHours !== undefined) 
-    ? (actualHours - requiredHours) 
-    : 0;
+                    const overtime = Number(stat.overtime) || 0;
+                    const actualHours = stat.netHours + overtime + stat.leaveHours;
+                    const requiredHours = stat.requiredHours;
+                    const monthDiff = (requiredHours !== null && requiredHours !== undefined) 
+                        ? (actualHours - requiredHours) 
+                        : 0;
                     
                     accumulated[staffName].compensatoryDays += monthDiff;
                     accumulated[staffName].monthlyDetails.push({
@@ -1908,8 +1926,6 @@ const monthDiff = (requiredHours !== null && requiredHours !== undefined)
                 }
             } else {
                 emptyCount++;
-                
-                // 連續 2 個月沒資料就停止
                 if (emptyCount >= 2) {
                     console.log(`⏸️ 累計差異計算停止於 ${monthInfo.monthStr}（連續 ${emptyCount} 個月無資料）`);
                     break;
@@ -1917,23 +1933,26 @@ const monthDiff = (requiredHours !== null && requiredHours !== undefined)
             }
         }
         
-        // 🆕 將累計值和月度明細加到當前統計中
+        // 🆕 儲存到快取
+        accumulatedDiffCache[currentMonthStr] = accumulated;
+        
+        // 將累計值和月度明細加到當前統計中
         for (const staffName in currentStats) {
             if (accumulated[staffName]) {
                 currentStats[staffName].accumulatedCompensatory = accumulated[staffName].compensatoryDays;
-                // 過濾掉當月的數據
                 currentStats[staffName].monthlyDetails = accumulated[staffName].monthlyDetails.filter(item => {
                     return !(item.year === currentYear && item.month === currentMonth + 1);
                 });
             }
         }
         
-        console.log(`✅ 累計差異計算完成（並行載入 ${results.length} 個月）`);
+        const elapsed = Date.now() - startTime;
+        console.log(`✅ 累計差異計算完成（${elapsed}ms，並行載入 ${results.length} 個月）`);
         
     } catch (e) {
         console.error('計算累計差異失敗:', e);
     }
-}    
+}
         function renderShiftDots(shiftInfo) {
             if (shiftInfo === '整天') return shifts.map(s => `<span class="shift-dot" style="background:${s.color};" title="${s.name}"></span>`).join('');
             return shiftInfo.split('+').map(name => {
@@ -2747,6 +2766,10 @@ const monthDiff = (requiredHours !== null && requiredHours !== undefined)
                     
                     // 同步 localStorage
                     saveLocalSchedule();
+                    
+                        // 🆕 清除該月份的累計差異快取（因為數據已更新）
+    delete accumulatedDiffCache[monthStr];
+    console.log('🗑️ 已清除 ' + monthStr + ' 的累計差異快取');
                     
                     let msg = '✅ 儲存完成';
                     if (data.webhookSent) {
