@@ -1891,7 +1891,13 @@ async function calculateAccumulatedDiff(currentStats) {
                     }
                     
                     const stat = data.stats[staffName];
-                    const monthDiff = stat.hoursDiff || 0;
+                    // ✅ 重新计算确保准确（使用后端返回的详细数据）
+const overtime = Number(stat.overtime) || 0;
+const actualHours = stat.netHours + overtime + stat.leaveHours;
+const requiredHours = stat.requiredHours;
+const monthDiff = (requiredHours !== null && requiredHours !== undefined) 
+    ? (actualHours - requiredHours) 
+    : 0;
                     
                     accumulated[staffName].compensatoryDays += monthDiff;
                     accumulated[staffName].monthlyDetails.push({
