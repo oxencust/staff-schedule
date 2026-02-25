@@ -1089,7 +1089,7 @@
             
             holidays = await fetchHolidays(currentYear);
             generateCalendar();
-            updateStats();
+            await updateStats();
         }
         
         function exitOvertimeMode() {
@@ -1106,10 +1106,10 @@
             document.getElementById('staffNameDisplay').innerHTML = 
                 `<span class="staff-name">${staffName}</span> 請點選<strong>可以上班</strong>的日期`;
             
-            fetchHolidays(currentYear).then(h => {
+            fetchHolidays(currentYear).then(async h => {
                 holidays = h;
                 generateCalendar();
-                updateStats();
+                await updateStats();
             });
         }
         
@@ -1519,8 +1519,6 @@
             
             body.appendChild(fragment);  // ← 只觸發 1 次 reflow
 
-            // 🆕 更新統計
-    updateStats();
         }
 
         function createDayCell(date) {
