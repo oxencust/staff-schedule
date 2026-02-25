@@ -1921,11 +1921,8 @@
             document.getElementById('holidayCount').textContent = holidayCount;
             document.getElementById('unmarkedCount').textContent = workDays - availableCount;
             
-            // 🆕 同時更新詳細統計
-            await Promise.all([
-                updateMyAvailabilityStats(),
-                updateActualScheduleStats()
-            ]);
+                updateMyAvailabilityStats();
+                updateActualScheduleStatsAsync();
         }
 
         async function previousMonth() {
@@ -2147,8 +2144,17 @@
         // ============ 🆕 統計功能 ============
         
         /**
-         * 統計 1：我填寫的可上班時段
-         */
+ * ⚡ 异步载入管理端排班统计（带loading提示）
+ */
+async function updateActualScheduleStatsAsync() {
+    const container = document.getElementById('actualScheduleStatsContent');
+    
+    // 显示载入中
+    container.innerHTML = '<div style="color:#999;font-size:13px;"><div style="display:inline-block;width:12px;height:12px;border:2px solid #e0e0e0;border-top-color:#10b981;border-radius:50%;animation:spin 1s linear infinite;margin-right:6px;"></div>載入中...</div>';
+    
+    // 异步载入实际数据
+    await updateActualScheduleStats();
+}
         /**
  * 統計 1：我填寫的可上班時段
  */
