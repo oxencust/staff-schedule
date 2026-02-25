@@ -1678,8 +1678,167 @@ if (s.requiredHours !== null) {
             }
             
             statsGrid.innerHTML = html;
+            // ⚡ 異步載入累計差異（不阻塞基本統計顯示）
+calculateAccumulatedDiff(stats).then(() => {
+    // 累計差異載入完成後重新渲染統計卡片
+    renderStatsWithAccumulated(stats, workDays, statsGrid);
+}).catch(err => {
+    console.error('載入累計差異失敗:', err);
+});
         }
 
+        /**
+         * ⚡ 重新渲染統計（包含累計差異）
+         */
+        function renderStatsWithAccumulated(stats, workDays, statsGrid) {
+            const monthStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
+            
+            let html = `<div style="grid-column: 1 / -1; padding: 10px 15px; background: var(--green-light); border-radius: 8px; margin-bottom: 10px; font-size: 13px;">
+                <strong>📅 ${currentYear}年${currentMonth + 1}月</strong>：工作日 ${workDays} 天，正職應排 ${workDays * 8}h，半薪應排 ${(workDays * 8) / 2}h
+            </div>`;
+            
+            const sortedStaff = Object.keys(stats).sort((a, b) => stats[b].days - stats[a].days);
+            
+            if (sortedStaff.length === 0 || sortedStaff.every(name => stats[name].days === 0)) {
+                html += '<p style="color: #666; padding: 10px;">本月尚無排班資料</p>';
+            } else {
+                sortedStaff.forEach(name => {
+                    const s = stats[name];
+                    if (s.days === 0) return;
+                    
+                    const netHours = Number(s.netHours) || 0;
+                    const overtime = Number(s.overtime) || 0;
+                    const totalHours = netHours + overtime;
+                    const breakHours = (Number(s.breakMinutes) || 0) / 60;
+                    const shiftSummary = Object.entries(s.shifts).map(([k, v]) => `${k}×${v}`).join('、');
+                    
+                    let breakDetail = '';
+                    if (s.break30 > 0 || s.break60 > 0) {
+                        const parts = [];
+                        if (s.break30 > 0) parts.push(`30分×${s.break30}`);
+                        if (s.break60 > 0) parts.push(`60分×${s.break60}`);
+                        breakDetail = parts.join('、');
+                    }
+                    
+                    let diffHtml = '';
+                    if (s.requiredHours !== null) {
+                        const actualHours = totalHours + s.leaveHours;
+                        const diff = actualHours - s.requiredHours;
+                        const diffColor = diff >= 0 ? '#10b981' : '#ef4444';
+                        const diffText = diff >= 0 ? `+${diff.toFixed(1)}（可補休）` : `${diff.toFixed(1)}（需補班）`;
+                        
+                        const accumulatedDiff = (s.accumulatedCompensatory || 0) + diff;
+                        const accDiffColor = accumulatedDiff > 0 ? '#10b981' : (accumulatedDiff < 0 ? '#ef4444' : '#6b7280');
+                        const accDiffSign = accumulatedDiff > 0 ? '+' : '';
+                        
+                        diffHtml = `
+                            <div class="stats-row" style="background: ${diff >= 0 ? '#ecfdf5' : '#fef2f2'}; margin: 6px -10px; padding: 8px 10px; border-radius: 4px;">
+                                <span class="stats-label">應排時數</span>
+                                <span class="stats-value">${s.requiredHours} 小時</span>
+                            </div>
+                            <div class="stats-row">
+                                <span class="stats-label" style="font-weight:600;">本月差異</span>
+                                <span class="stats-value" style="color: ${diffColor}; font-weight: 700;">${diffText}</span>
+                            </div>
+                            <div class="stats-row" style="background: #f3f4f6; margin: 6px -10px; padding: 8px 10px; border-radius: 4px;">
+                                <span class="stats-label" style="font-weight:600;">累計差異</span>
+                                <span class="stats-value" style="color: ${accDiffColor}; font-weight: 700; font-size: 16px;">${accDiffSign}${accumulatedDiff.toFixed(1)} 小時</span>
+                            </div>`;
+                        
+                        // 月度明細
+                        if (s.monthlyDetails && s.monthlyDetails.length > 0) {
+                            const yearlyGroups = {};
+                            s.monthlyDetails.forEach(item => {
+                                if (!yearlyGroups[item.year]) {
+                                    yearlyGroups[item.year] = [];
+                                }
+                                yearlyGroups[item.year].push(item);
+                            });
+                            
+                            let yearlyHtml = '';
+                            const sortedYears = Object.keys(yearlyGroups).sort((a, b) => b - a);
+                            
+                            sortedYears.forEach(year => {
+                                const yearMonths = yearlyGroups[year];
+                                const yearTotal = yearMonths.reduce((sum, m) => sum + m.diff, 0);
+                                const yearColor = yearTotal > 0 ? '#10b981' : (yearTotal < 0 ? '#ef4444' : '#6b7280');
+                                const yearSign = yearTotal > 0 ? '+' : '';
+                                
+                                yearlyHtml += `
+                                    <div class="year-summary" style="background:#f9fafb;padding:8px 10px;border-radius:6px;margin:4px -10px;">
+                                        <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="toggleMonthlyDetails('${name}', ${year})">
+                                            <div style="display:flex;align-items:center;gap:6px;">
+                                                <span style="font-weight:600;font-size:12px;color:#666;">📅 ${year}年明細</span>
+                                                <span id="toggle-icon-${name}-${year}" style="font-size:10px;color:#999;">▼</span>
+                                            </div>
+                                            <span style="font-weight:700;color:${yearColor};font-size:13px;">${yearSign}${yearTotal.toFixed(1)}h</span>
+                                        </div>
+                                        <div id="monthly-${name}-${year}" class="monthly-details" style="display:none;margin-top:8px;padding-top:8px;border-top:1px dashed #ddd;">
+                                            ${yearMonths.sort((a, b) => b.month - a.month).map(m => {
+                                                const mColor = m.diff > 0 ? '#10b981' : (m.diff < 0 ? '#ef4444' : '#6b7280');
+                                                const mSign = m.diff > 0 ? '+' : '';
+                                                return `<div style="display:flex;justify-content:space-between;font-size:11px;padding:3px 0;">
+                                                    <span style="color:#666;">${m.month}月</span>
+                                                    <span style="color:${mColor};font-weight:600;">${mSign}${m.diff.toFixed(1)}h</span>
+                                                </div>`;
+                                            }).join('')}
+                                        </div>
+                                    </div>`;
+                            });
+                            
+                            diffHtml += yearlyHtml;
+                        }
+                    }
+                    
+                    const typeColor = s.staffType === '正職' ? '#10b981' : s.staffType === '半薪正職' ? '#3b82f6' : '#9ca3af';
+                    const typeBadge = `<span style="font-size:10px;padding:2px 6px;border-radius:3px;background:${typeColor};color:white;margin-left:8px;">${s.staffType}</span>`;
+                    
+                    html += `<div class="stats-card">
+                        <div class="staff-name">${name}${typeBadge}</div>
+                        <div class="stats-row">
+                            <span class="stats-label">出勤天數</span>
+                            <span class="stats-value highlight">${s.days} 天</span>
+                        </div>
+                        <div class="stats-row">
+                            <span class="stats-label">班別時長</span>
+                            <span class="stats-value">${s.rawHours.toFixed(1)} 小時</span>
+                        </div>
+                        <div class="stats-row">
+                            <span class="stats-label">休息時間</span>
+                            <span class="stats-value" style="color: #f59e0b;">-${breakHours.toFixed(1)} 小時</span>
+                        </div>
+                        ${breakDetail ? `<div class="stats-row">
+                            <span class="stats-label" style="font-size: 11px; color: #999;">休息明細</span>
+                            <span class="stats-value" style="font-size: 11px; color: #f59e0b;">${breakDetail}</span>
+                        </div>` : ''}
+                        <div class="stats-row">
+                            <span class="stats-label">實際工時</span>
+                            <span class="stats-value">${s.netHours.toFixed(1)} 小時</span>
+                        </div>
+                        ${s.overtime > 0 ? `<div class="stats-row">
+                            <span class="stats-label">加班時數</span>
+                            <span class="stats-value" style="color: #10b981;">+${s.overtime} 小時</span>
+                        </div>` : ''}
+                        ${s.leaveHours > 0 ? `<div class="stats-row">
+                            <span class="stats-label">請假時數</span>
+                            <span class="stats-value" style="color: #9ca3af;">${s.leaveHours} 小時</span>
+                        </div>` : ''}
+                        <div class="stats-row" style="margin-top: 6px; padding-top: 6px; border-top: 1px solid #ddd;">
+                            <span class="stats-label">總計時數</span>
+                            <span class="stats-value highlight">${totalHours.toFixed(1)} 小時</span>
+                        </div>
+                        ${diffHtml}
+                        <div class="stats-row" style="margin-top: 6px; padding-top: 6px; border-top: 1px dashed #ddd;">
+                            <span class="stats-label" style="font-size: 11px;">班別</span>
+                            <span class="stats-value" style="font-size: 11px; color: #666;">${shiftSummary || '-'}</span>
+                        </div>
+                    </div>`;
+                });
+            }
+            
+            statsGrid.innerHTML = html;
+            console.log('✅ 統計更新完成（含累計差異）');
+        }
         /**
  * 🆕 計算累計差異（補休、加班等）+ 月度明細
  * ⚡ 優化版：並行載入多個月份
