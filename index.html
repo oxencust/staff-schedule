@@ -1565,7 +1565,7 @@ if (s.requiredHours !== null) {
     const diffColor = diff >= 0 ? '#10b981' : '#ef4444';
     const diffText = diff >= 0 ? `+${diff.toFixed(1)}（可補休）` : `${diff.toFixed(1)}（需補班）`;
     
-    // 🆕 計算累計差異
+    // 計算累計差異
     const accumulatedDiff = (s.accumulatedCompensatory || 0) + diff;
     const accDiffColor = accumulatedDiff > 0 ? '#10b981' : (accumulatedDiff < 0 ? '#ef4444' : '#6b7280');
     const accDiffSign = accumulatedDiff > 0 ? '+' : '';
@@ -1583,6 +1583,52 @@ if (s.requiredHours !== null) {
             <span class="stats-label" style="font-weight:600;">累計差異</span>
             <span class="stats-value" style="color: ${accDiffColor}; font-weight: 700; font-size: 16px;">${accDiffSign}${accumulatedDiff.toFixed(1)} 小時</span>
         </div>`;
+    
+    // 🆕 月度明細展開區域
+    if (s.monthlyDetails && s.monthlyDetails.length > 0) {
+        // 按年度分組
+        const yearlyGroups = {};
+        s.monthlyDetails.forEach(item => {
+            if (!yearlyGroups[item.year]) {
+                yearlyGroups[item.year] = [];
+            }
+            yearlyGroups[item.year].push(item);
+        });
+        
+        // 生成年度摘要
+        let yearlyHtml = '';
+        const sortedYears = Object.keys(yearlyGroups).sort((a, b) => b - a);  // 降序排列（最新年份在前）
+        
+        sortedYears.forEach(year => {
+            const yearMonths = yearlyGroups[year];
+            const yearTotal = yearMonths.reduce((sum, m) => sum + m.diff, 0);
+            const yearColor = yearTotal > 0 ? '#10b981' : (yearTotal < 0 ? '#ef4444' : '#6b7280');
+            const yearSign = yearTotal > 0 ? '+' : '';
+            
+            yearlyHtml += `
+                <div class="year-summary" style="background:#f9fafb;padding:8px 10px;border-radius:6px;margin:4px -10px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="toggleMonthlyDetails('${name}', ${year})">
+                        <div style="display:flex;align-items:center;gap:6px;">
+                            <span style="font-weight:600;font-size:12px;color:#666;">📅 ${year}年明細</span>
+                            <span id="toggle-icon-${name}-${year}" style="font-size:10px;color:#999;">▼</span>
+                        </div>
+                        <span style="font-weight:700;color:${yearColor};font-size:13px;">${yearSign}${yearTotal.toFixed(1)}h</span>
+                    </div>
+                    <div id="monthly-${name}-${year}" class="monthly-details" style="display:none;margin-top:8px;padding-top:8px;border-top:1px dashed #ddd;">
+                        ${yearMonths.sort((a, b) => b.month - a.month).map(m => {
+                            const mColor = m.diff > 0 ? '#10b981' : (m.diff < 0 ? '#ef4444' : '#6b7280');
+                            const mSign = m.diff > 0 ? '+' : '';
+                            return `<div style="display:flex;justify-content:space-between;font-size:11px;padding:3px 0;">
+                                <span style="color:#666;">${m.month}月</span>
+                                <span style="color:${mColor};font-weight:600;">${mSign}${m.diff.toFixed(1)}h</span>
+                            </div>`;
+                        }).join('')}
+                    </div>
+                </div>`;
+        });
+        
+        diffHtml += yearlyHtml;
+    }
 }
                     
                     const typeColor = s.staffType === '正職' ? '#10b981' : s.staffType === '半薪正職' ? '#3b82f6' : '#9ca3af';
@@ -1635,71 +1681,78 @@ if (s.requiredHours !== null) {
         }
 
         /**
- * 🆕 計算累計差異（補休、加班等）
- */
-async function calculateAccumulatedDiff(currentStats) {
-    if (!API_URL) return;
-    
-    try {
-        // 獲取當前月份之前的所有月份統計
-        const currentDate = new Date(currentYear, currentMonth, 1);
-        let accumulated = {};
-        
-        // 🆕 改成：往前推最多 12 個月，但遇到空資料就停止
-        let emptyMonthCount = 0;  // 連續空資料月份計數
-        
-        for (let i = 1; i <= 12; i++) {
-            const checkDate = new Date(currentYear, currentMonth - i, 1);
-            const checkYear = checkDate.getFullYear();
-            const checkMonth = checkDate.getMonth() + 1;
-            const monthStr = `${checkYear}-${String(checkMonth).padStart(2, '0')}`;
+         * 🆕 計算累計差異（補休、加班等）+ 月度明細
+         */
+        async function calculateAccumulatedDiff(currentStats) {
+            if (!API_URL) return;
             
-            // 從 API 獲取歷史統計
-            const res = await fetch(`${API_URL}?action=getMonthStats&month=${monthStr}`);
-            const data = await res.json();
-            
-            // 🆕 檢查是否有資料
-            const hasData = data.success && data.stats && Object.keys(data.stats).length > 0;
-            
-            if (hasData) {
-                emptyMonthCount = 0;  // 重置計數
+            try {
+                // 獲取當前月份之前的所有月份統計
+                const currentDate = new Date(currentYear, currentMonth, 1);
+                let accumulated = {};
                 
-                // 累計每個員工的差異
-                for (const staffName in data.stats) {
-                    if (!accumulated[staffName]) {
-                        accumulated[staffName] = {
-                            compensatoryDays: 0,
-                            overtimeDays: 0
-                        };
-                    }
+                let emptyMonthCount = 0;  // 連續空資料月份計數
+                
+                for (let i = 1; i <= 12; i++) {
+                    const checkDate = new Date(currentYear, currentMonth - i, 1);
+                    const checkYear = checkDate.getFullYear();
+                    const checkMonth = checkDate.getMonth() + 1;
+                    const monthStr = `${checkYear}-${String(checkMonth).padStart(2, '0')}`;
                     
-                    const stat = data.stats[staffName];
-                    // 累計補休/加班差異（以小時為單位）
-                    accumulated[staffName].compensatoryDays += (stat.hoursDiff || 0);
+                    // 從 API 獲取歷史統計
+                    const res = await fetch(`${API_URL}?action=getMonthStats&month=${monthStr}`);
+                    const data = await res.json();
+                    
+                    const hasData = data.success && data.stats && Object.keys(data.stats).length > 0;
+                    
+                    if (hasData) {
+                        emptyMonthCount = 0;  // 重置計數
+                        
+                        // 累計每個員工的差異
+                        for (const staffName in data.stats) {
+                            if (!accumulated[staffName]) {
+                                accumulated[staffName] = {
+                                    compensatoryDays: 0,
+                                    monthlyDetails: []  // 🆕 每月明細
+                                };
+                            }
+                            
+                            const stat = data.stats[staffName];
+                            const monthDiff = stat.hoursDiff || 0;
+                            
+                            // 累計差異
+                            accumulated[staffName].compensatoryDays += monthDiff;
+                            
+                            // 🆕 記錄每月明細
+                            accumulated[staffName].monthlyDetails.push({
+                                year: checkYear,
+                                month: checkMonth,
+                                diff: monthDiff
+                            });
+                        }
+                    } else {
+                        emptyMonthCount++;
+                        
+                        // 連續 2 個月沒資料就停止
+                        if (emptyMonthCount >= 2) {
+                            console.log(`⏸️ 累計差異計算停止於 ${monthStr}（連續 ${emptyMonthCount} 個月無資料）`);
+                            break;
+                        }
+                    }
                 }
-            } else {
-                emptyMonthCount++;
                 
-                // 🆕 連續 2 個月沒資料就停止（避免誤判，因為可能某個月真的沒排班）
-                if (emptyMonthCount >= 2) {
-                    console.log(`⏸️ 累計差異計算停止於 ${monthStr}（連續 ${emptyMonthCount} 個月無資料）`);
-                    break;
+                // 🆕 將累計值和月度明細加到當前統計中
+                for (const staffName in currentStats) {
+                    if (accumulated[staffName]) {
+                        currentStats[staffName].accumulatedCompensatory = accumulated[staffName].compensatoryDays;
+                        currentStats[staffName].monthlyDetails = accumulated[staffName].monthlyDetails;
+                    }
                 }
+                
+            } catch (e) {
+                console.error('計算累計差異失敗:', e);
             }
-        }
-        
-        // 🆕 將累計值加到當前統計中
-        for (const staffName in currentStats) {
-            if (accumulated[staffName]) {
-                currentStats[staffName].accumulatedCompensatory = accumulated[staffName].compensatoryDays;
-            }
-        }
-        
-    } catch (e) {
-        console.error('計算累計差異失敗:', e);
-    }
-}
-
+        }    
         function renderShiftDots(shiftInfo) {
             if (shiftInfo === '整天') return shifts.map(s => `<span class="shift-dot" style="background:${s.color};" title="${s.name}"></span>`).join('');
             return shiftInfo.split('+').map(name => {
@@ -2536,6 +2589,23 @@ async function calculateAccumulatedDiff(currentStats) {
                 loadingToast.classList.remove('show');
                 console.error('儲存錯誤:', e);
                 showToast('❌ 儲存失敗：' + e.message);
+            }
+        }
+        /**
+         * 🆕 展開/收起月度明細
+         */
+        function toggleMonthlyDetails(staffName, year) {
+            const elem = document.getElementById(`monthly-${staffName}-${year}`);
+            const icon = document.getElementById(`toggle-icon-${staffName}-${year}`);
+            
+            if (elem && icon) {
+                if (elem.style.display === 'none') {
+                    elem.style.display = 'block';
+                    icon.textContent = '▲';
+                } else {
+                    elem.style.display = 'none';
+                    icon.textContent = '▼';
+                }
             }
         }
     </script>
