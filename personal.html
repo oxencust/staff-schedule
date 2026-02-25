@@ -147,7 +147,7 @@
         .legend h4 { font-size: 12px; margin-bottom: 8px; color: var(--pink-dark); }
         .legend-grid { 
             display: grid; 
-            grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); 
+            grid-template-columns: repeat(auto-fit, minimin(90px, 1fr)); 
             gap: 6px; 
         }
         .legend-item { 
@@ -467,8 +467,12 @@
                 </div>
                 <div class="stats-grid">
                     <div class="stat-card pink">
-                        <div class="stat-label">可上班</div>
+                        <div class="stat-label">可上班天數</div>
                         <div class="stat-value" id="availableCount">0</div>
+                    </div>
+                    <div class="stat-card pink">
+                        <div class="stat-label">可上班時數</div>
+                        <div class="stat-value" id="availableHours">0</div>
                     </div>
                     <div class="stat-card yellow">
                         <div class="stat-label">國定假日</div>
@@ -1542,51 +1546,51 @@
             }
 
             if (mySchedule && isCurrentMonth) {
-    const shift = shifts.find(s => s.id === mySchedule.shiftId);
-    
-    // 🆕 三層降級邏輯取得班別名稱和時間
-    let shiftName = '';
-    let shiftTime = '';
-    let shiftColor = '#4b5563';
-    
-    if (shift) {
-        // 1. 班別存在：使用班別設定
-        shiftName = shift.name;
-        shiftTime = shift.time;
-        shiftColor = shift.color;
-    } else if (mySchedule.shiftTime) {
-        // 2. 班別已刪除，但有 shiftTime：使用資料庫的時間
-        shiftName = mySchedule.shiftName || mySchedule.shiftId;
-        shiftTime = mySchedule.shiftTime;
-    } else if (mySchedule.shiftName) {
-        // 3. 從 shiftName 解析時間
-        const timeMatch = mySchedule.shiftName.match(/(\d{1,2}:\d{2})-(\d{1,2}:\d{2})/);
-        if (timeMatch) {
-            shiftTime = timeMatch[0];
-            shiftName = mySchedule.shiftName;
-        } else {
-            shiftName = mySchedule.shiftName;
-        }
-    } else {
-        shiftName = mySchedule.shiftId;
-    }
-    
-    // 自訂班別用紫色
-    if (mySchedule.shiftId && mySchedule.shiftId.startsWith('custom_')) {
-        shiftColor = '#a78bfa';
-    }
+                const shift = shifts.find(s => s.id === mySchedule.shiftId);
+                
+                // 🆕 三層降級邏輯取得班別名稱和時間
+                let shiftName = '';
+                let shiftTime = '';
+                let shiftColor = '#4b5563';
+                
+                if (shift) {
+                    // 1. 班別存在：使用班別設定
+                    shiftName = shift.name;
+                    shiftTime = shift.time;
+                    shiftColor = shift.color;
+                } else if (mySchedule.shiftTime) {
+                    // 2. 班別已刪除，但有 shiftTime：使用資料庫的時間
+                    shiftName = mySchedule.shiftName || mySchedule.shiftId;
+                    shiftTime = mySchedule.shiftTime;
+                } else if (mySchedule.shiftName) {
+                    // 3. 從 shiftName 解析時間
+                    const timeMatch = mySchedule.shiftName.match(/(\d{1,2}:\d{2})-(\d{1,2}:\d{2})/);
+                    if (timeMatch) {
+                        shiftTime = timeMatch[0];
+                        shiftName = mySchedule.shiftName;
+                    } else {
+                        shiftName = mySchedule.shiftName;
+                    }
+                } else {
+                    shiftName = mySchedule.shiftId;
+                }
+                
+                // 自訂班別用紫色
+                if (mySchedule.shiftId && mySchedule.shiftId.startsWith('custom_')) {
+                    shiftColor = '#a78bfa';
+                }
                 
                 html += '<div style="margin-top: 4px; padding-top: 4px; border-top: 1px dashed #ddd;">';
-html += '<div style="font-size: 9px; color: #666; margin-bottom: 2px;">已排班：</div>';
-html += `<div class="shift-badges">`;
+                html += '<div style="font-size: 9px; color: #666; margin-bottom: 2px;">已排班：</div>';
+                html += `<div class="shift-badges">`;
 
-// 🆕 顯示班別名稱和時間
-if (shiftTime) {
-    html += `<span class="shift-badge" style="background: ${shiftColor}; color: white;">${shiftName}</span>`;
-    html += `<span class="shift-badge" style="background: #6b7280; color: white;">${shiftTime}</span>`;
-} else {
-    html += `<span class="shift-badge" style="background: ${shiftColor}; color: white;">${shiftName}</span>`;
-}
+                // 🆕 顯示班別名稱和時間
+                if (shiftTime) {
+                    html += `<span class="shift-badge" style="background: ${shiftColor}; color: white;">${shiftName}</span>`;
+                    html += `<span class="shift-badge" style="background: #6b7280; color: white;">${shiftTime}</span>`;
+                } else {
+                    html += `<span class="shift-badge" style="background: ${shiftColor}; color: white;">${shiftName}</span>`;
+                }
                 
                 if (mySchedule.overtimeStart && mySchedule.overtimeEnd) {
                     const otStatus = mySchedule.overtimeStatus === '已審核' ? '✓' : '⏳';
@@ -1625,11 +1629,11 @@ if (shiftTime) {
             `;
             fragment.appendChild(allDayDiv);
             
-            // 班別選項
+            // 班別選項（排除假別和已刪除的班別）
             shifts.filter(shift => !shift.isLeave && !shift.disabled).forEach(shift => {
-    const shiftDiv = document.createElement('div');
-    shiftDiv.className = 'shift-option';
-    shiftDiv.id = `shift_${shift.id}_option`;
+                const shiftDiv = document.createElement('div');
+                shiftDiv.className = 'shift-option';
+                shiftDiv.id = `shift_${shift.id}_option`;
                 shiftDiv.onclick = () => toggleShiftOption(shift.id);
                 shiftDiv.style.borderLeft = `4px solid ${shift.color}`;
                 shiftDiv.innerHTML = `
@@ -1659,29 +1663,29 @@ if (shiftTime) {
             fragment.appendChild(customDiv);
             
             // 自訂時間輸入
-const customInputDiv = document.createElement('div');
-customInputDiv.className = 'custom-shift-inputs';
-customInputDiv.id = 'customShiftInputs';
+            const customInputDiv = document.createElement('div');
+            customInputDiv.className = 'custom-shift-inputs';
+            customInputDiv.id = 'customShiftInputs';
 
-// 生成時間選項（只有整點和30分）
-let timeOptions = '<option value="">請選擇</option>';
-for (let h = 6; h <= 23; h++) {
-    const hour = String(h).padStart(2, '0');
-    timeOptions += `<option value="${hour}:00">${hour}:00</option>`;
-    timeOptions += `<option value="${hour}:30">${hour}:30</option>`;
-}
+            // 生成時間選項（只有整點和30分）
+            let timeOptions = '<option value="">請選擇</option>';
+            for (let h = 6; h <= 23; h++) {
+                const hour = String(h).padStart(2, '0');
+                timeOptions += `<option value="${hour}:00">${hour}:00</option>`;
+                timeOptions += `<option value="${hour}:30">${hour}:30</option>`;
+            }
 
-customInputDiv.innerHTML = `
-    <div class="custom-time-row">
-        <select class="custom-time-input" id="customStartTime" style="padding: 10px 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; text-align: center;">
-            ${timeOptions}
-        </select>
-        <span class="custom-time-separator">～</span>
-        <select class="custom-time-input" id="customEndTime" style="padding: 10px 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; text-align: center;">
-            ${timeOptions}
-        </select>
-    </div>
-`;
+            customInputDiv.innerHTML = `
+                <div class="custom-time-row">
+                    <select class="custom-time-input" id="customStartTime" style="padding: 10px 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; text-align: center;">
+                        ${timeOptions}
+                    </select>
+                    <span class="custom-time-separator">～</span>
+                    <select class="custom-time-input" id="customEndTime" style="padding: 10px 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; text-align: center;">
+                        ${timeOptions}
+                    </select>
+                </div>
+            `;
             fragment.appendChild(customInputDiv);
             
             // ⚡ 一次性插入
@@ -1798,9 +1802,25 @@ customInputDiv.innerHTML = `
             updateStats();
         }
 
+        /**
+         * 🆕 計算班別時數的輔助函數
+         */
+        function calculateShiftHours(timeStr) {
+            if (!timeStr || !timeStr.includes('-')) return 0;
+            
+            const [start, end] = timeStr.split('-');
+            const [startH, startM] = start.split(':').map(Number);
+            const [endH, endM] = end.split(':').map(Number);
+            
+            const startMinutes = startH * 60 + startM;
+            const endMinutes = endH * 60 + endM;
+            
+            return (endMinutes - startMinutes) / 60;
+        }
+
         function updateStats() {
             const lastDay = new Date(currentYear, currentMonth + 1, 0);
-            let workDays = 0, holidayCount = 0, availableCount = 0;
+            let workDays = 0, holidayCount = 0, availableCount = 0, totalHours = 0;
             
             for (let d = 1; d <= lastDay.getDate(); d++) {
                 const date = new Date(currentYear, currentMonth, d);
@@ -1809,15 +1829,44 @@ customInputDiv.innerHTML = `
                 const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
                 const holidayInfo = holidays.find(h => h.date === dateStr);
                 
-                if (holidayInfo) holidayCount++;
-                else if (!isWeekend) {
+                if (holidayInfo) {
+                    holidayCount++;
+                } else if (!isWeekend) {
                     workDays++;
                     const data = availableDates[dateStr];
-                    if (data && (data.allDay || (data.shifts && data.shifts.length > 0) || data.customTime)) availableCount++;
+                    if (data && (data.allDay || (data.shifts && data.shifts.length > 0) || data.customTime)) {
+                        availableCount++;
+                        
+                        // 🆕 計算時數
+                        if (data.allDay) {
+                            totalHours += 8; // 整天算8小時
+                        } else {
+                            // 計算所選班別的總時數
+                            let dayHours = 0;
+                            
+                            if (data.shifts && data.shifts.length > 0) {
+                                data.shifts.forEach(shiftId => {
+                                    const shift = shifts.find(s => s.id === shiftId);
+                                    if (shift && shift.time) {
+                                        const hours = calculateShiftHours(shift.time);
+                                        dayHours += hours;
+                                    }
+                                });
+                            }
+                            
+                            if (data.customTime) {
+                                const hours = calculateShiftHours(data.customTime);
+                                dayHours += hours;
+                            }
+                            
+                            totalHours += dayHours;
+                        }
+                    }
                 }
             }
             
             document.getElementById('availableCount').textContent = availableCount;
+            document.getElementById('availableHours').textContent = totalHours;
             document.getElementById('holidayCount').textContent = holidayCount;
             document.getElementById('unmarkedCount').textContent = workDays - availableCount;
         }
