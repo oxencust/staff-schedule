@@ -1742,12 +1742,15 @@ if (s.requiredHours !== null) {
                 }
                 
                 // 🆕 將累計值和月度明細加到當前統計中
-                for (const staffName in currentStats) {
-                    if (accumulated[staffName]) {
-                        currentStats[staffName].accumulatedCompensatory = accumulated[staffName].compensatoryDays;
-                        currentStats[staffName].monthlyDetails = accumulated[staffName].monthlyDetails;
-                    }
-                }
+for (const staffName in currentStats) {
+    if (accumulated[staffName]) {
+        currentStats[staffName].accumulatedCompensatory = accumulated[staffName].compensatoryDays;
+        // 🆕 過濾掉當月的數據（當月數據是實時計算的，不應出現在歷史明細中）
+        currentStats[staffName].monthlyDetails = accumulated[staffName].monthlyDetails.filter(item => {
+            return !(item.year === currentYear && item.month === currentMonth + 1);
+        });
+    }
+}
                 
             } catch (e) {
                 console.error('計算累計差異失敗:', e);
