@@ -1943,8 +1943,8 @@
                 await loadCurrentMonthSchedule();
             }
             
-            generateCalendar(); 
-            updateStats();
+            generateCalendar();
+            await updateStats();
         }
 
         async function nextMonth() {
@@ -1961,7 +1961,7 @@
             }
             
             generateCalendar(); 
-            updateStats();
+            await updateStats();
         }
 
         function saveLocalData() { localStorage.setItem(`available_${staffName}`, JSON.stringify(availableDates)); }
