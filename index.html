@@ -1975,31 +1975,31 @@ async function calculateAccumulatedDiff(currentStats) {
         const toDate = new Date(currentYear, currentMonth, 0); // 上個月最後一天
         const toStr = `${toDate.getFullYear()}-${String(toDate.getMonth() + 1).padStart(2, '0')}-${String(toDate.getDate()).padStart(2, '0')}`;
 
-        // 🆕 載入所有相關年份的國定假日（與 getWorkDays 一致）
+        // 🆕 按年份載入假日（當前年份直接複用全域 holidays，其他年份 fetch）
+        const holidaysByYear = {};
+        holidaysByYear[currentYear] = holidays; // 複用已載入的全域變數，確保一致
+
         const yearsNeeded = new Set();
         for (let i = 1; i <= 12; i++) {
             const d = new Date(currentYear, currentMonth - i, 1);
             yearsNeeded.add(d.getFullYear());
         }
-        const allHolidayDates = new Set();
         for (const yr of yearsNeeded) {
-            try {
-                const hRes = await fetch('https://cdn.jsdelivr.net/gh/ruyut/TaiwanCalendar/data/' + yr + '.json');
-                const hData = await hRes.json();
-                if (hData && Array.isArray(hData)) {
-                    hData.forEach(record => {
-                        if (record.isHoliday && record.description && record.description.trim() !== '') {
-                            const d = record.date;
-                            allHolidayDates.add(d.substring(0, 4) + '-' + d.substring(4, 6) + '-' + d.substring(6, 8));
-                        }
-                    });
+            if (!holidaysByYear[yr]) {
+                try {
+                    const fetched = await fetchHolidays(yr); // 複用同一個 fetchHolidays 函數
+                    holidaysByYear[yr] = fetched;
+                    console.log(`📅 已載入 ${yr} 年假日：${fetched.length} 筆`);
+                } catch (e) {
+                    console.warn(`⚠️ 載入 ${yr} 年假日失敗`, e);
+                    holidaysByYear[yr] = [];
                 }
-                console.log(`📅 已載入 ${yr} 年假日`);
-            } catch (e) { console.warn(`⚠️ 載入 ${yr} 年假日失敗`, e); }
+            }
         }
 
-        // 🆕 改良版：計算工作日（排除週末 + 國定假日，與 getWorkDays 一致）
-        function getWorkDaysWithHolidays(year, month) {
+        // 🆕 計算工作日（與 getWorkDays 完全一致的邏輯，但可指定年份的假日）
+        function getWorkDaysForMonth(year, month) {
+            const yearHolidays = holidaysByYear[year] || [];
             let wd = 0;
             const lastDay = new Date(year, month, 0).getDate();
             for (let d = 1; d <= lastDay; d++) {
@@ -2007,7 +2007,7 @@ async function calculateAccumulatedDiff(currentStats) {
                 const dayOfWeek = date.getDay();
                 const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
                 const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-                const isHoliday = allHolidayDates.has(dateStr);
+                const isHoliday = yearHolidays.some(h => h.date === dateStr);
                 if (!isWeekend && !isHoliday) wd++;
             }
             return wd;
@@ -2067,8 +2067,8 @@ async function calculateAccumulatedDiff(currentStats) {
                     staffGroups[name].push(r);
                 });
 
-                // 🆕 用含假日的工作日計算（與 updateStats 一致）
-                const workDays = getWorkDaysWithHolidays(monthInfo.year, monthInfo.month);
+                // 🆕 用含假日的工作日計算（與 updateStats/getWorkDays 完全一致）
+                const workDays = getWorkDaysForMonth(monthInfo.year, monthInfo.month);
 
                 for (const sName in staffGroups) {
                     if (!accumulated[sName]) {
