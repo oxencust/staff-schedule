@@ -1165,14 +1165,15 @@
             try {
                 const monthStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
                 const startDate = monthStr + '-01';
-                const endDate = monthStr + '-31';
+                const [_y, _m] = monthStr.split('-').map(Number);
+const endDate = `${_m === 12 ? _y + 1 : _y}-${String(_m === 12 ? 1 : _m + 1).padStart(2, '0')}-01`;
 
                 const { data, error } = await sb
                     .from('staff_schedules')
                     .select('*')
                     .eq('staff_id', staffId)
                     .gte('schedule_date', startDate)
-                    .lte('schedule_date', endDate);
+                    .lt('schedule_date', endDate);
 
                 if (!error && data) {
                     lastMonthSchedules = {};
@@ -1196,14 +1197,15 @@
             try {
                 const monthStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
                 const startDate = monthStr + '-01';
-                const endDate = monthStr + '-31';
+                const [_y, _m] = monthStr.split('-').map(Number);
+const endDate = `${_m === 12 ? _y + 1 : _y}-${String(_m === 12 ? 1 : _m + 1).padStart(2, '0')}-01`;
 
                 const { data, error } = await sb
                     .from('staff_schedules')
                     .select('*')
                     .eq('staff_id', staffId)
                     .gte('schedule_date', startDate)
-                    .lte('schedule_date', endDate);
+                    .lt('schedule_date', endDate);
 
                 if (!error && data) {
                     currentMonthSchedules = {};
@@ -2373,14 +2375,15 @@ async function updateMyAvailabilityStats() {
             try {
                 const monthStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
                 const startDate = monthStr + '-01';
-                const endDate = monthStr + '-31';
+                const [_y, _m] = monthStr.split('-').map(Number);
+const endDate = `${_m === 12 ? _y + 1 : _y}-${String(_m === 12 ? 1 : _m + 1).padStart(2, '0')}-01`;
 
                 const { data: schedArr, error } = await sb
                     .from('staff_schedules')
                     .select('*')
                     .eq('staff_id', staffId)
                     .gte('schedule_date', startDate)
-                    .lte('schedule_date', endDate);
+                    .lt('schedule_date', endDate);
 
                 if (error || !schedArr || schedArr.length === 0) {
                     container.innerHTML = '<div style="color:#999;font-size:13px;">本月尚無排班</div>';
