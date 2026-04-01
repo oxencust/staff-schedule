@@ -375,7 +375,6 @@
             .staff-shift-row .staff-name { font-size: 11px; }
         }
     </style>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
     <nav class="navbar">
@@ -541,19 +540,9 @@
                 document.querySelector('.navbar').style.display = 'none';
             });
         }
-       // ============ 設定區（請在這裡修改）============
+        // ============ 設定區（請在這裡修改）============
         const API_URL = 'https://script.google.com/macros/s/AKfycbwEdZA12dNylUn9qkBvVEvtNlB7ncovgNqoQvpp6bJqd-kO4jdCH56inrfmVQGxMq_hJA/exec';
-        const SUPABASE_URL = 'https://mnjilhpztnowaplggvkk.supabase.co';
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1uamlsaHB6dG5vd2FwbGdndmtrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU3MDA0ODYsImV4cCI6MjA4MTI3NjQ4Nn0.X3e9DF3iT2KUR9ma3_Ins01vG607R155v0xia8hO_Qg';
-        const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-        async function retryFetch(url, options, maxRetries = 2) {
-            for (let i = 0; i <= maxRetries; i++) {
-                try { const res = await fetch(url, options); return res; }
-                catch(err) { if (i === maxRetries) throw err; await new Promise(r => setTimeout(r, 1000)); }
-            }
-        }
-
+        
         let staffList = [];
         let shifts = [];
         let currentYear = new Date().getFullYear();
@@ -755,42 +744,18 @@
         // 從 API 載入排班資料（返回資料而不直接覆蓋 schedule）
         async function loadScheduleFromAPI(monthStr) {
             if (!monthStr) monthStr = getCurrentMonthStr();
-
+            if (!API_URL) return {};
+            
             try {
-                const startDate = monthStr + '-01';
-                const [_y, _m] = monthStr.split('-').map(Number);
-const endDate = `${_m === 12 ? _y + 1 : _y}-${String(_m === 12 ? 1 : _m + 1).padStart(2, '0')}-01`;
-
-                const { data, error } = await sb
-                    .from('staff_schedules')
-                    .select('*')
-                    .gte('schedule_date', startDate)
-                    .lt('schedule_date', endDate);
-
-                if (!error && data) {
-                    // 轉換成原本 { "2026-04-01": [{ staffName, shiftId, ... }] } 格式
-                    const schedules = {};
-                    data.forEach(r => {
-                        if (!schedules[r.schedule_date]) schedules[r.schedule_date] = [];
-                        schedules[r.schedule_date].push({
-                            staffName: r.staff_id,
-                            shiftId: r.shift_type,
-                            shiftName: r.shift_type,
-                            startTime: r.start_time,
-                            endTime: r.end_time,
-                            overtimeStart: r.overtime_start,
-                            overtimeEnd: r.overtime_end,
-                            overtimeStatus: r.overtime_status,
-                            overtimeHours: r.overtime_hours,
-                            leaveType: r.leave_type,
-                            leaveHours: r.leave_hours
-                        });
-                    });
-                    console.log('從 Supabase 載入', Object.keys(schedules).length, '天排班資料');
-                    return schedules;
+                const res = await fetch(API_URL + '?action=getSchedules&month=' + monthStr);
+                const data = await res.json();
+                
+                if (data.success && data.schedules) {
+                    console.log('從 API 載入', Object.keys(data.schedules).length, '天排班資料');
+                    return data.schedules;
                 }
             } catch (e) {
-                console.error('從 Supabase 載入排班失敗', e);
+                console.error('從 API 載入排班失敗', e);
             }
             return {};
         }
@@ -798,9 +763,10 @@ const endDate = `${_m === 12 ? _y + 1 : _y}-${String(_m === 12 ? 1 : _m + 1).pad
         async function updateApiStatus() {
             const status = document.getElementById('apiStatus');
             try {
-                const { data, error } = await sb.from('shifts').select('id').limit(1);
-                if (!error) {
-                    status.textContent = '✓ 已連線 (Supabase)';
+                const res = await fetch(API_URL + '?action=getShifts');
+                const data = await res.json();
+                if (data.success) {
+                    status.textContent = '✓ 已連線';
                     status.classList.add('connected');
                     status.classList.remove('disconnected');
                     return;
@@ -886,19 +852,13 @@ const endDate = `${_m === 12 ? _y + 1 : _y}-${String(_m === 12 ? 1 : _m + 1).pad
                 return;
             }
             
-            // 從 Supabase 載入
+            // 從 API 載入
+            if (!API_URL) return;
             try {
-                const { data, error } = await sb.from('staff').select('*');
-                if (!error && data) {
-                    staffList = data.map(s => ({
-                        name: s.name,
-                        staffType: s.staff_type || 'PT',
-                        link: s.link || '',
-                        availability: s.availability || '',
-                        totalDays: s.total_days || 0,
-                        submitTime: s.submit_time || '',
-                        id: s.id
-                    }));
+                const res = await fetch(API_URL + '?action=getStaff');
+                const data = await res.json();
+                if (data.success) { 
+                    staffList = data.staff;
                     setCachedData('staff_cache', staffList); // 快取
                     renderStaffList();
                 }
@@ -1010,11 +970,13 @@ const endDate = `${_m === 12 ? _y + 1 : _y}-${String(_m === 12 ? 1 : _m + 1).pad
                 return;
             }
             
-            // 從 Supabase 載入
+            // 從 API 載入
+            if (!API_URL) return;
             try {
-                const { data, error } = await sb.from('shifts').select('*');
-                if (!error && data) {
-                    shifts = data;
+                const res = await fetch(API_URL + '?action=getShifts');
+                const data = await res.json();
+                if (data.success) { 
+                    shifts = data.shifts;
                     setCachedData('shifts_cache', shifts); // 快取
                     renderShiftList();
                     updateLegend();
@@ -1034,14 +996,13 @@ const endDate = `${_m === 12 ? _y + 1 : _y}-${String(_m === 12 ? 1 : _m + 1).pad
                 return;
             }
             
-            // 從 Supabase 載入（從 staff 表取不重複的 staff_type）
+            // 從 API 載入
+            if (!API_URL) return;
             try {
-                const { data, error } = await sb.from('staff').select('staff_type');
-                if (!error && data) {
-                    const types = [...new Set(data.map(s => s.staff_type).filter(Boolean))];
-                    // 確保預設值存在
-                    ['正職', 'PT', '半薪正職'].forEach(t => { if (!types.includes(t)) types.push(t); });
-                    staffTypes = types;
+                const res = await fetch(API_URL + '?action=getStaffTypes');
+                const data = await res.json();
+                if (data.success && data.types) { 
+                    staffTypes = data.types;
                     setCachedData('staffTypes_cache', staffTypes); // 快取
                     updateTypeSelects();
                 }
@@ -1879,23 +1840,6 @@ calculateAccumulatedDiff(stats).then(() => {
             statsGrid.innerHTML = html;
             console.log('✅ 統計更新完成（含累計差異）');
         }
-
-function parseTimeToMinutes(timeStr) {
-            if (!timeStr) return 0;
-            const [h, m] = timeStr.split(':').map(Number);
-            return h * 60 + (m || 0);
-        }
-
-        function calculateWorkDaysForMonth(year, month) {
-            let workDays = 0;
-            const lastDay = new Date(year, month, 0).getDate();
-            for (let d = 1; d <= lastDay; d++) {
-                const dayOfWeek = new Date(year, month - 1, d).getDay();
-                if (dayOfWeek !== 0 && dayOfWeek !== 6) workDays++;
-            }
-            return workDays;
-        }
-
         /**
  * ⚡ 計算累計差異（優化版：使用快取）
  */
@@ -1918,111 +1862,73 @@ async function calculateAccumulatedDiff(currentStats) {
         return;
     }
     
-   console.log('📥 計算累計差異（從 Supabase 載入）...');
+    console.log('📥 計算累計差異（從 API 載入）...');
     const startTime = Date.now();
-
+    
     try {
         const currentDate = new Date(currentYear, currentMonth, 1);
         let accumulated = {};
-
-        // 計算 12 個月前的起始日期
-        const fromDate = new Date(currentYear, currentMonth - 12, 1);
-        const fromStr = `${fromDate.getFullYear()}-${String(fromDate.getMonth() + 1).padStart(2, '0')}-01`;
-        const toDate = new Date(currentYear, currentMonth, 0); // 上個月最後一天
-        const toStr = `${toDate.getFullYear()}-${String(toDate.getMonth() + 1).padStart(2, '0')}-${String(toDate.getDate()).padStart(2, '0')}`;
-
-        // 一次查詢 12 個月的排班資料
-        const { data: allSchedules, error } = await sb
-            .from('staff_schedules')
-            .select('*')
-            .gte('schedule_date', fromStr)
-            .lte('schedule_date', toStr);
-
-        if (error || !allSchedules || allSchedules.length === 0) {
-            console.log('⏸️ 無歷史排班資料');
-        } else {
-            // 按月份分組
-            const monthsToCheck = [];
-            for (let i = 1; i <= 12; i++) {
-                const checkDate = new Date(currentYear, currentMonth - i, 1);
-                monthsToCheck.push({
-                    year: checkDate.getFullYear(),
-                    month: checkDate.getMonth() + 1,
-                    monthStr: `${checkDate.getFullYear()}-${String(checkDate.getMonth() + 1).padStart(2, '0')}`
-                });
-            }
-
-            // 建立 staffId → staffName 對照
-            const staffMap = {};
-            staffList.forEach(s => { if (s.id) staffMap[s.id] = s.name; });
-
-            let emptyCount = 0;
-
-            for (const monthInfo of monthsToCheck) {
-                const prefix = monthInfo.monthStr;
-                const monthData = allSchedules.filter(r => r.schedule_date && r.schedule_date.startsWith(prefix));
-
-                if (monthData.length === 0) {
-                    emptyCount++;
-                    if (emptyCount >= 2) {
-                        console.log(`⏸️ 累計差異計算停止於 ${prefix}（連續 ${emptyCount} 個月無資料）`);
-                        break;
-                    }
-                    continue;
-                }
-
+        
+        // ⚡ 並行請求：一次性請求最近 12 個月
+        const requests = [];
+        const monthsToCheck = [];
+        
+        for (let i = 1; i <= 12; i++) {
+            const checkDate = new Date(currentYear, currentMonth - i, 1);
+            const checkYear = checkDate.getFullYear();
+            const checkMonth = checkDate.getMonth() + 1;
+            const monthStr = `${checkYear}-${String(checkMonth).padStart(2, '0')}`;
+            
+            monthsToCheck.push({ year: checkYear, month: checkMonth, monthStr });
+            requests.push(
+                fetch(`${API_URL}?action=getMonthStats&month=${monthStr}`)
+                    .then(res => res.json())
+                    .catch(() => ({ success: false }))
+            );
+        }
+        
+        // ⚡ 等待所有請求完成
+        const results = await Promise.all(requests);
+        
+        // ⚡ 處理結果（找到第一個空資料就停止）
+        let emptyCount = 0;
+        
+        for (let i = 0; i < results.length; i++) {
+            const data = results[i];
+            const monthInfo = monthsToCheck[i];
+            const hasData = data.success && data.stats && Object.keys(data.stats).length > 0;
+            
+            if (hasData) {
                 emptyCount = 0;
-
-                // 按員工分組計算統計
-                const staffGroups = {};
-                monthData.forEach(r => {
-                    const name = staffMap[r.staff_id] || r.staff_id;
-                    if (!staffGroups[name]) staffGroups[name] = [];
-                    staffGroups[name].push(r);
-                });
-
-                // 計算每個員工的月度差異
-                const workDays = calculateWorkDaysForMonth(monthInfo.year, monthInfo.month);
-
-                for (const sName in staffGroups) {
-                    if (!accumulated[sName]) {
-                        accumulated[sName] = { compensatoryDays: 0, monthlyDetails: [] };
+                
+                for (const staffName in data.stats) {
+                    if (!accumulated[staffName]) {
+                        accumulated[staffName] = {
+                            compensatoryDays: 0,
+                            monthlyDetails: []
+                        };
                     }
-
-                    const records = staffGroups[sName];
-                    let netHours = 0, overtimeH = 0, leaveH = 0;
-
-                    records.forEach(r => {
-                        // 計算排班時數
-                        if (r.start_time && r.end_time) {
-                            const sh = parseTimeToMinutes(r.start_time);
-                            const eh = parseTimeToMinutes(r.end_time);
-                            let rawMin = eh - sh;
-                            if (rawMin < 0) rawMin += 1440;
-                            const rawHrs = rawMin / 60;
-                            const breakMin = rawHrs >= 9 ? 60 : rawHrs > 4 ? 30 : 0;
-                            netHours += (rawMin - breakMin) / 60;
-                        }
-                        overtimeH += Number(r.overtime_hours) || 0;
-                        leaveH += Number(r.leave_hours) || 0;
-                    });
-
-                    // 取得員工類型
-                    const staffInfo = staffList.find(s => s.name === sName);
-                    const staffType = staffInfo ? staffInfo.staffType : 'PT';
-                    const requiredHours = staffType === '正職' ? workDays * 8
-                        : staffType === '半薪正職' ? (workDays * 8) / 2
-                        : null;
-
-                    const actualHours = netHours + overtimeH + leaveH;
-                    const monthDiff = (requiredHours !== null) ? (actualHours - requiredHours) : 0;
-
-                    accumulated[sName].compensatoryDays += monthDiff;
-                    accumulated[sName].monthlyDetails.push({
+                    
+                    const stat = data.stats[staffName];
+                    const overtime = Number(stat.overtime) || 0;
+                    const actualHours = stat.netHours + overtime + stat.leaveHours;
+                    const requiredHours = stat.requiredHours;
+                    const monthDiff = (requiredHours !== null && requiredHours !== undefined) 
+                        ? (actualHours - requiredHours) 
+                        : 0;
+                    
+                    accumulated[staffName].compensatoryDays += monthDiff;
+                    accumulated[staffName].monthlyDetails.push({
                         year: monthInfo.year,
                         month: monthInfo.month,
                         diff: monthDiff
                     });
+                }
+            } else {
+                emptyCount++;
+                if (emptyCount >= 2) {
+                    console.log(`⏸️ 累計差異計算停止於 ${monthInfo.monthStr}（連續 ${emptyCount} 個月無資料）`);
+                    break;
                 }
             }
         }
@@ -2041,7 +1947,7 @@ async function calculateAccumulatedDiff(currentStats) {
         }
         
         const elapsed = Date.now() - startTime;
-        console.log(`✅ 累計差異計算完成（${elapsed}ms）`);
+        console.log(`✅ 累計差異計算完成（${elapsed}ms，並行載入 ${results.length} 個月）`);
         
     } catch (e) {
         console.error('計算累計差異失敗:', e);
@@ -2553,25 +2459,11 @@ async function calculateAccumulatedDiff(currentStats) {
             container.innerHTML = '<div class="loading"><div class="spinner"></div>載入中...</div>';
             
             try {
-                const { data, error } = await sb
-                    .from('overtime_records')
-                    .select('*')
-                    .eq('status', '待審核')
-                    .order('overtime_date', { ascending: false });
-
-                if (!error) {
-                    pendingOvertimes = (data || []).map(r => ({
-                        id: r.id,
-                        rowIndex: r.id,
-                        staffName: r.staff_name,
-                        date: r.overtime_date,
-                        shiftName: r.shift_name || '',
-                        startTime: r.start_time || '',
-                        endTime: r.end_time || '',
-                        hours: r.hours,
-                        note: r.note || '',
-                        submitTime: r.created_at || ''
-                    }));
+                const res = await fetch(API_URL + '?action=getPendingOvertimeReview');
+                const data = await res.json();
+                
+                if (data.success) {
+                    pendingOvertimes = data.records || [];
                     renderOvertimeReview();
                 } else {
                     container.innerHTML = '<p style="color:#666;padding:20px;">載入失敗</p>';
@@ -2722,25 +2614,11 @@ async function calculateAccumulatedDiff(currentStats) {
             container.innerHTML = '<div class="loading"><div class="spinner"></div>載入中...</div>';
             
             try {
-                const { data, error } = await sb
-                    .from('leave_requests')
-                    .select('*')
-                    .eq('status', '待審核')
-                    .order('leave_date', { ascending: false });
-
-                if (!error) {
-                    pendingLeaves = (data || []).map(r => ({
-                        id: r.id,
-                        rowIndex: r.id,
-                        staffName: r.staff_name,
-                        date: r.leave_date,
-                        requestDate: r.request_date,
-                        shiftName: r.shift_name || '',
-                        leaveType: r.leave_type,
-                        hours: r.hours,
-                        reason: r.reason || '',
-                        status: r.status
-                    }));
+                const res = await fetch(API_URL + '?action=getPendingLeaveReview');
+                const data = await res.json();
+                
+                if (data.success) {
+                    pendingLeaves = data.records || [];
                     renderLeaveReview();
                 } else {
                     container.innerHTML = '<p style="color:#666;padding:20px;">載入失敗</p>';
