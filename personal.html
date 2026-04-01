@@ -1769,12 +1769,10 @@ data.forEach(r => {
                 html += '<div style="font-size: 9px; color: #666; margin-bottom: 2px;">已排班：</div>';
                 html += `<div class="shift-badges">`;
 
-                // 🆕 顯示班別名稱和時間
-                if (shiftTime) {
-                    html += `<span class="shift-badge" style="background: ${shiftColor}; color: white;">${shiftName}</span>`;
+                // 🆕 顯示班別名稱和時間（名稱已含時段則不重複顯示）
+                html += `<span class="shift-badge" style="background: ${shiftColor}; color: white;">${shiftName}</span>`;
+                if (shiftTime && !shiftName.includes(shiftTime)) {
                     html += `<span class="shift-badge" style="background: #6b7280; color: white;">${shiftTime}</span>`;
-                } else {
-                    html += `<span class="shift-badge" style="background: ${shiftColor}; color: white;">${shiftName}</span>`;
                 }
                 
                 if (mySchedule.overtimeStart && mySchedule.overtimeEnd) {
