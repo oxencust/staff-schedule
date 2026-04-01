@@ -469,6 +469,7 @@
             font-size: 15px;
         }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
     <div class="loading-screen" id="loadingScreen">
@@ -810,9 +811,21 @@
             }
         }
         
-        // ============ 設定區 ============
+   // ============ 設定區 ============
         const API_URL = 'https://script.google.com/macros/s/AKfycbwEdZA12dNylUn9qkBvVEvtNlB7ncovgNqoQvpp6bJqd-kO4jdCH56inrfmVQGxMq_hJA/exec';
-        
+        const SUPABASE_URL = 'https://mnjilhpztnowaplggvkk.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1uamlsaHB6dG5vd2FwbGdndmtrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU3MDA0ODYsImV4cCI6MjA4MTI3NjQ4Nn0.X3e9DF3iT2KUR9ma3_Ins01vG607R155v0xia8hO_Qg';
+        const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        async function retryFetch(url, options, maxRetries = 2) {
+            for (let i = 0; i <= maxRetries; i++) {
+                try { const res = await fetch(url, options); return res; }
+                catch(err) { if (i === maxRetries) throw err; await new Promise(r => setTimeout(r, 1000)); }
+            }
+        }
+
+        let staffId = '';
+
         let currentYear = new Date().getFullYear();
         let currentMonth = new Date().getMonth();
         let holidays = [];
@@ -830,12 +843,39 @@
         // ⚡ 並行載入優化
         window.onload = async function() {
             const urlParams = new URLSearchParams(window.location.search);
+            const uidParam = urlParams.get('uid') || '';
             staffName = urlParams.get('name') || urlParams.get('staff') || '';
-            
+
+            // 用 LINE uid 查員工，取得 staffId
+            if (uidParam) {
+                try {
+                    const { data, error } = await sb
+                        .from('staff')
+                        .select('id, name')
+                        .eq('line_id_edu', uidParam)
+                        .single();
+                    if (!error && data) {
+                        staffId = data.id;
+                        if (!staffName) staffName = data.name;
+                    }
+                } catch(e) { console.error('查詢員工失敗', e); }
+            }
+            // 向下相容：用 name 查 id
+            if (!staffId && staffName) {
+                try {
+                    const { data, error } = await sb
+                        .from('staff')
+                        .select('id')
+                        .eq('name', staffName)
+                        .single();
+                    if (!error && data) staffId = data.id;
+                } catch(e) { console.error('查詢員工失敗', e); }
+            }
+
             if (!staffName) {
                 document.getElementById('staffNameDisplay').innerHTML = '⚠️ 請從管理員提供的連結進入';
             } else {
-                document.getElementById('staffNameDisplay').innerHTML = 
+                document.getElementById('staffNameDisplay').innerHTML =
                     `<span class="staff-name">${staffName}</span> 請點選<strong>可以上班</strong>的日期`;
             }
             
@@ -879,11 +919,24 @@
             
             try {
                 const year = new Date().getFullYear();
-                const res = await fetch(API_URL + '?action=getMyLeaveRecords&staff=' + encodeURIComponent(staffName) + '&year=' + year);
-                const data = await res.json();
-                
-                if (data.success) {
-                    myLeaveRecords = data.records || [];
+                const { data, error } = await sb
+                    .from('leave_requests')
+                    .select('*')
+                    .eq('staff_name', staffName)
+                    .gte('leave_date', year + '-01-01')
+                    .lte('leave_date', year + '-12-31')
+                    .order('leave_date', { ascending: false });
+
+                if (!error) {
+                    myLeaveRecords = (data || []).map(r => ({
+                        date: r.leave_date,
+                        requestDate: r.request_date,
+                        shiftName: r.shift_name || '',
+                        leaveType: r.leave_type,
+                        hours: r.hours,
+                        reason: r.reason || '',
+                        status: r.status || '待審核'
+                    }));
                     renderLeaveRecords();
                 }
             } catch (e) {
@@ -960,32 +1013,25 @@
             }
             
             try {
-                const month = dateStr.substring(0, 7);
-                const res = await fetch(API_URL + '?action=getSchedules&month=' + month);
-                const data = await res.json();
-                
-                if (data.success && data.schedules) {
-                    const daySchedule = data.schedules[dateStr] || [];
-                    const mySchedule = daySchedule.find(s => s.staffName === staffName);
-                    
-                    if (mySchedule && mySchedule.shiftId) {
-                        const shiftsRes = await fetch(API_URL + '?action=getShifts');
-                        const shiftsData = await shiftsRes.json();
-                        const shift = (shiftsData.shifts || []).find(s => s.id === mySchedule.shiftId);
-                        
-                        if (shift) {
-                            shiftNameSpan.textContent = shift.name + (shift.time ? ` (${shift.time})` : '');
-                            shiftContainer.style.display = 'block';
-                            return;
-                        }
-                    }
+                const { data, error } = await sb
+                    .from('staff_schedules')
+                    .select('shift_type, start_time, end_time')
+                    .eq('staff_id', staffId)
+                    .eq('schedule_date', dateStr)
+                    .limit(1);
+
+                if (!error && data && data.length > 0) {
+                    const r = data[0];
+                    shiftNameSpan.textContent = r.shift_type + (r.start_time ? ` (${r.start_time}-${r.end_time})` : '');
+                    shiftContainer.style.display = 'block';
+                    return;
                 }
-                
+
                 shiftNameSpan.textContent = '無排班';
                 shiftContainer.style.display = 'block';
             } catch (e) {
-                console.error('檢查排班失敗', e);
-                shiftContainer.style.display = 'none';
+                shiftNameSpan.textContent = '無排班';
+                shiftContainer.style.display = 'block';
             }
         }
         
@@ -1008,33 +1054,33 @@
             
             try {
                 showToast('📤 送出中...');
-                
-                const payload = {
-                    action: 'submitLeave',
-                    staff: staffName,
-                    submissions: [{
-                        date: dateStr,
-                        shiftName: shiftName !== '無排班' ? shiftName : '',
-                        leaveType: leaveType,
-                        hours: hours,
-                        reason: reason
-                    }]
+
+                // ── 1. 主寫入：Supabase ──
+                const insertData = {
+                    staff_name: staffName,
+                    request_date: new Date().toISOString().split('T')[0],
+                    leave_date: dateStr,
+                    shift_name: shiftName !== '無排班' ? shiftName : '',
+                    leave_type: leaveType,
+                    hours: hours,
+                    reason: reason,
+                    status: '待審核'
                 };
-                
-                const res = await fetch(API_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'text/plain' },
-                    body: JSON.stringify(payload)
-                });
-                const data = await res.json();
-                
-                if (data.success) {
-                    showToast('✅ 請假申請已送出！');
-                    closeLeaveModal();
-                    loadMyLeaveRecords();
-                } else {
-                    showToast('❌ 送出失敗：' + (data.error || ''));
-                }
+                const { error } = await sb.from('leave_requests').insert(insertData);
+                if (error) { showToast('❌ 送出失敗：' + error.message); return; }
+
+                // ── 2. GAS callback（失敗不影響主流程）──
+                try {
+                    const payload = {
+                        action: 'submitLeave', staff: staffName, source: 'supabase_frontend',
+                        submissions: [{ date: dateStr, shiftName: shiftName !== '無排班' ? shiftName : '', leaveType, hours, reason }]
+                    };
+                    await retryFetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(payload) });
+                } catch(sheetErr) { console.warn('⚠️ GAS 回寫失敗:', sheetErr); }
+
+                showToast('✅ 請假申請已送出！');
+                closeLeaveModal();
+                loadMyLeaveRecords();
             } catch (e) {
                 console.error('送出請假申請失敗', e);
                 showToast('❌ 送出失敗，請檢查網路');
@@ -1113,22 +1159,31 @@
             });
         }
         
-        async function loadLastMonthSchedules() {
-            if (!API_URL) return;
-            
+      async function loadLastMonthSchedules() {
+            if (!staffId) return;
+
             try {
                 const monthStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
-                const res = await fetch(API_URL + '?action=getSchedules&month=' + monthStr);
-                const data = await res.json();
-                
-                if (data.success && data.schedules) {
+                const startDate = monthStr + '-01';
+                const endDate = monthStr + '-31';
+
+                const { data, error } = await sb
+                    .from('staff_schedules')
+                    .select('*')
+                    .eq('staff_id', staffId)
+                    .gte('schedule_date', startDate)
+                    .lte('schedule_date', endDate);
+
+                if (!error && data) {
                     lastMonthSchedules = {};
-                    for (const dateStr in data.schedules) {
-                        const mySchedule = data.schedules[dateStr].find(s => s.staffName === staffName);
-                        if (mySchedule) {
-                            lastMonthSchedules[dateStr] = mySchedule;
-                        }
-                    }
+                    data.forEach(r => {
+                        lastMonthSchedules[r.schedule_date] = {
+                            staffName: staffName,
+                            shiftName: r.shift_type,
+                            startTime: r.start_time,
+                            endTime: r.end_time
+                        };
+                    });
                 }
             } catch (e) {
                 console.error('載入上月排班失敗', e);
@@ -1136,21 +1191,36 @@
         }
         
         async function loadCurrentMonthSchedule() {
-            if (!API_URL) return;
-            
+            if (!staffId) return;
+
             try {
                 const monthStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
-                const res = await fetch(API_URL + '?action=getSchedules&month=' + monthStr);
-                const data = await res.json();
-                
-                if (data.success && data.schedules) {
+                const startDate = monthStr + '-01';
+                const endDate = monthStr + '-31';
+
+                const { data, error } = await sb
+                    .from('staff_schedules')
+                    .select('*')
+                    .eq('staff_id', staffId)
+                    .gte('schedule_date', startDate)
+                    .lte('schedule_date', endDate);
+
+                if (!error && data) {
                     currentMonthSchedules = {};
-                    for (const dateStr in data.schedules) {
-                        const mySchedule = data.schedules[dateStr].find(s => s.staffName === staffName);
-                        if (mySchedule) {
-                            currentMonthSchedules[dateStr] = mySchedule;
-                        }
-                    }
+                    data.forEach(r => {
+                        currentMonthSchedules[r.schedule_date] = {
+                            staffName: staffName,
+                            shiftName: r.shift_type,
+                            startTime: r.start_time,
+                            endTime: r.end_time,
+                            overtimeStart: r.overtime_start,
+                            overtimeEnd: r.overtime_end,
+                            overtimeStatus: r.overtime_status,
+                            overtimeHours: r.overtime_hours,
+                            leaveType: r.leave_type,
+                            leaveHours: r.leave_hours
+                        };
+                    });
                     console.log('✅ 已載入當月排班:', Object.keys(currentMonthSchedules).length, '天');
                 }
             } catch (e) {
@@ -1234,19 +1304,27 @@
                     }]
                 };
                 
-                const res = await fetch(API_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'text/plain' },
-                    body: JSON.stringify(payload)
-                });
-                const data = await res.json();
-                
-                if (data.success) {
-                    showToast('✅ 加班申請已送出！');
-                    closeOvertimeFillModal();
-                } else {
-                    showToast('❌ 送出失敗：' + (data.error || ''));
-                }
+               // ── 1. 主寫入：Supabase ──
+                const insertData = {
+                    staff_name: staffName,
+                    overtime_date: payload.submissions[0].date,
+                    shift_name: shiftName,
+                    start_time: startTime || null,
+                    end_time: endTime || null,
+                    note: note,
+                    status: '待審核'
+                };
+                const { error } = await sb.from('overtime_records').insert(insertData);
+                if (error) { showToast('❌ 送出失敗：' + error.message); return; }
+
+                // ── 2. GAS callback ──
+                try {
+                    payload.source = 'supabase_frontend';
+                    await retryFetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(payload) });
+                } catch(sheetErr) { console.warn('⚠️ GAS 回寫失敗:', sheetErr); }
+
+                showToast('✅ 加班申請已送出！');
+                closeOvertimeFillModal();
             } catch (e) {
                 console.error('送出失敗', e);
                 showToast('❌ 送出失敗，請檢查網路');
@@ -1348,21 +1426,30 @@
                     submissions
                 };
                 
-                const res = await fetch(API_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'text/plain' },
-                    body: JSON.stringify(payload)
-                });
-                const data = await res.json();
-                
-                if (data.success) {
-                    showToast('✅ 加班時間已送出，等待審核');
-                    pendingOvertimes = [];
-                    localStorage.removeItem('pendingOvertimes_' + staffName);
-                    closeOvertimeModal();
-                } else {
-                    showToast('❌ 送出失敗：' + (data.error || ''));
-                }
+               // ── 1. 主寫入：Supabase（批次）──
+                const sbInserts = submissions.map(s => ({
+                    staff_name: staffName,
+                    overtime_date: s.date,
+                    shift_name: s.shiftName || '',
+                    start_time: s.startTime || null,
+                    end_time: s.endTime || null,
+                    hours: s.hours || null,
+                    note: s.noOvertime ? '無加班' : '',
+                    status: '待審核'
+                }));
+                const { error } = await sb.from('overtime_records').insert(sbInserts);
+                if (error) { showToast('❌ 送出失敗：' + error.message); return; }
+
+                // ── 2. GAS callback ──
+                try {
+                    payload.source = 'supabase_frontend';
+                    await retryFetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(payload) });
+                } catch(sheetErr) { console.warn('⚠️ GAS 回寫失敗:', sheetErr); }
+
+                showToast('✅ 加班時間已送出，等待審核');
+                pendingOvertimes = [];
+                localStorage.removeItem('pendingOvertimes_' + staffName);
+                closeOvertimeModal();
             } catch (e) {
                 localStorage.setItem('overtimeSubmissions_' + staffName, JSON.stringify(submissions));
                 showToast('⚠️ 網路異常，已暫存本地，請稍後重試');
@@ -1393,15 +1480,14 @@
             }
             
             try {
-                const res = await fetch(API_URL + '?action=getShifts');
-                const data = await res.json();
-                if (data.success && data.shifts) { 
-                    shifts = data.shifts;
-                    
+               const { data, error } = await sb.from('shifts').select('*');
+                if (!error && data) {
+                    shifts = data;
+
                     // 🆕 儲存到快取（7 天）
                     setCache(cacheKey, shifts, 7);
-                    
-                    loadLeaveOptions(data.shifts);
+
+                    loadLeaveOptions(data);
                     return shifts;
                 }
             } catch (e) {
@@ -1966,13 +2052,13 @@
             if (!API_URL || !staffName) return false;
             
             try {
-                const res = await fetch(API_URL + '?action=getStaff');
-                const data = await res.json();
-                
-                if (!data.success || !data.staff) return false;
-                
-                const myData = data.staff.find(s => s.name === staffName);
-                if (!myData || !myData.availability) return false;
+                const { data: myData, error } = await sb
+                    .from('staff')
+                    .select('availability')
+                    .eq('name', staffName)
+                    .single();
+
+                if (error || !myData || !myData.availability) return false;
                 
                 const lines = myData.availability.split('\n').filter(line => line.trim());
                 if (lines.length === 0) return false;
@@ -2109,22 +2195,23 @@
             
             showToast('📤 正在送出...');
             
-            try {
+           try {
                 const totalDays = availabilityArr.length;
-                const payload = { 
-                    action: 'updateAvailability',
-                    name: staffName, 
-                    availability: availabilityStr,
-                    totalDays: totalDays
-                };
-                
-                const res = await fetch(API_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'text/plain' },
-                    body: JSON.stringify(payload)
-                });
-                const data = await res.json();
-                showToast(data.success ? '✅ 已送出！' : '❌ 送出失敗：' + (data.error || ''));
+
+                // ── 1. 主寫入：Supabase ──
+                const { error } = await sb
+                    .from('staff')
+                    .update({ availability: availabilityStr, updated_at: new Date().toISOString() })
+                    .eq('name', staffName);
+                if (error) { showToast('❌ 送出失敗：' + error.message); return; }
+
+                // ── 2. GAS callback ──
+                try {
+                    const payload = { action: 'updateAvailability', name: staffName, availability: availabilityStr, totalDays, source: 'supabase_frontend' };
+                    await retryFetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(payload) });
+                } catch(sheetErr) { console.warn('⚠️ GAS 回寫失敗:', sheetErr); }
+
+                showToast('✅ 已送出！');
             } catch (e) {
                 console.error('送出失敗', e);
                 showToast('❌ 送出失敗，請檢查網路');
@@ -2284,28 +2371,38 @@ async function updateMyAvailabilityStats() {
             }
             
             try {
-                // 從 API 獲取本月統計
                 const monthStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
-                const res = await fetch(`${API_URL}?action=getMonthStats&month=${monthStr}`);
-                const data = await res.json();
-                
-                if (!data.success || !data.stats || !data.stats[staffName]) {
+                const startDate = monthStr + '-01';
+                const endDate = monthStr + '-31';
+
+                const { data: schedArr, error } = await sb
+                    .from('staff_schedules')
+                    .select('*')
+                    .eq('staff_id', staffId)
+                    .gte('schedule_date', startDate)
+                    .lte('schedule_date', endDate);
+
+                if (error || !schedArr || schedArr.length === 0) {
                     container.innerHTML = '<div style="color:#999;font-size:13px;">本月尚無排班</div>';
                     return;
                 }
-                
-                const stats = data.stats[staffName];
-                
-                // 從 API 取得詳細排班資料來計算統計
-                const schedRes = await fetch(`${API_URL}?action=getSchedules&month=${monthStr}`);
-                const schedData = await schedRes.json();
-                
-                if (!schedData.success || !schedData.schedules) {
-                    container.innerHTML = '<div style="color:#999;font-size:13px;">無法載入排班資料</div>';
-                    return;
-                }
-                
-                const schedules = schedData.schedules;
+
+                const stats = { totalDays: schedArr.length };
+
+                // 轉換成原本 schedules 格式以相容下面的統計邏輯
+                const schedules = {};
+                schedArr.forEach(r => {
+                    if (!schedules[r.schedule_date]) schedules[r.schedule_date] = [];
+                    schedules[r.schedule_date].push({
+                        staffName: staffName,
+                        shiftName: r.shift_type,
+                        startTime: r.start_time,
+                        endTime: r.end_time,
+                        overtimeHours: r.overtime_hours,
+                        leaveType: r.leave_type,
+                        leaveHours: r.leave_hours
+                    });
+                });
                 
                 // 計算詳細統計
                 let days = 0, rawHours = 0, breakMinutes = 0, netHours = 0, overtimeHours = 0, leaveHours = 0;
@@ -2536,14 +2633,15 @@ async function updateMyAvailabilityStats() {
         /**
          * 取得自己的員工資訊
          */
-        async function getMyStaffInfo() {
-            if (!API_URL) return null;
+       async function getMyStaffInfo() {
+            if (!staffName) return null;
             try {
-                const res = await fetch(API_URL + '?action=getStaff');
-                const data = await res.json();
-                if (data.success && data.staff) {
-                    return data.staff.find(s => s.name === staffName);
-                }
+                const { data, error } = await sb
+                    .from('staff')
+                    .select('*')
+                    .eq('name', staffName)
+                    .single();
+                if (!error && data) return data;
             } catch (e) {
                 console.error('取得員工資訊失敗:', e);
             }
