@@ -573,12 +573,13 @@
             const saved = localStorage.getItem('savedMonths');
             if (saved) savedMonths = JSON.parse(saved);
             
-            // ✨ 並行載入所有資料
+            // ✨ 先載入基礎資料（員工、班別），再載入排班
             await Promise.all([
                 loadAllData(),
-                (async () => { holidays = await fetchHolidays(currentYear); })(),
-                loadScheduleData(getCurrentMonthStr())
+                (async () => { holidays = await fetchHolidays(currentYear); })()
             ]);
+            // 基礎資料載入完成後才載入排班（需要 staffList 和 shifts 來轉換名稱）
+            await loadScheduleData(getCurrentMonthStr());
             
             generateCalendar();
             updateLegend();
