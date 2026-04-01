@@ -1201,7 +1201,7 @@ const endDate = `${_m === 12 ? _y + 1 : _y}-${String(_m === 12 ? 1 : _m + 1).pad
                             staffName: staffName,
                             shiftId: r.shift_type,
                             shiftName: displayName,
-                            shiftColor: shiftDef ? shiftDef.color : (r.shift_type && r.shift_type.startsWith('custom_') ? '#a78bfa' : '#4b5563'),
+                            shiftColor: shiftDef ? shiftDef.color : (r.shift_type && r.shift_type.startsWith('custom_') ? getCustomShiftColor(r.start_time, r.end_time) : '#4b5563'),
                             shiftTime: shiftTime || (r.start_time && r.end_time ? trimSec(r.start_time) + '-' + trimSec(r.end_time) : ''),
                             startTime: trimSec(r.start_time),
                             endTime: trimSec(r.end_time)
@@ -1253,7 +1253,7 @@ data.forEach(r => {
         staffName: staffName,
         shiftId: r.shift_type,
         shiftName: displayName,
-        shiftColor: shiftDef ? shiftDef.color : (r.shift_type && r.shift_type.startsWith('custom_') ? '#a78bfa' : '#4b5563'),
+        shiftColor: shiftDef ? shiftDef.color : (r.shift_type && r.shift_type.startsWith('custom_') ? getCustomShiftColor(r.start_time, r.end_time) : '#4b5563'),
         shiftTime: shiftTime || (r.start_time && r.end_time ? trimSec(r.start_time) + '-' + trimSec(r.end_time) : ''),
         startTime: trimSec(r.start_time),
         endTime: trimSec(r.end_time),
@@ -1681,11 +1681,12 @@ data.forEach(r => {
                 }
                 
                 if (mySchedule) {
-                    const shift = shifts.find(s => s.id === mySchedule.shiftId);
-                    const shiftName = shift ? shift.name : mySchedule.shiftId;
+                    const shiftName = mySchedule.shiftName || mySchedule.shiftId;
+                    const shiftTime = mySchedule.shiftTime || '';
                     cell.style.background = '#fef3c7';
                     cell.style.cursor = 'pointer';
                     html += `<div style="font-size:11px;font-weight:500;color:#92400e;margin-top:2px;">${shiftName}</div>`;
+                    if (shiftTime) html += `<div style="font-size:10px;color:#92400e;">${shiftTime}</div>`;
                     html += `<div style="font-size:10px;color:#666;">點擊回填加班</div>`;
                 } else if (isCurrentMonth && !holidayInfo) {
                     cell.style.cursor = 'pointer';
@@ -1759,9 +1760,9 @@ data.forEach(r => {
                     shiftName = mySchedule.shiftId;
                 }
                 
-                // 自訂班別用紫色
+                // 自訂班別：依時數分顏色（≤4h 淡藍 / >4h 深藍）
                 if (mySchedule.shiftId && mySchedule.shiftId.startsWith('custom_')) {
-                    shiftColor = '#a78bfa';
+                    shiftColor = mySchedule.shiftColor || getCustomShiftColor(mySchedule.startTime, mySchedule.endTime);
                 }
                 
                 html += '<div style="margin-top: 4px; padding-top: 4px; border-top: 1px dashed #ddd;">';
@@ -2263,6 +2264,15 @@ data.forEach(r => {
                 console.error('送出失敗', e);
                 showToast('❌ 送出失敗，請檢查網路');
             }
+        }
+
+        // 自訂班別顏色：依時數分（≤4h 淡藍 / >4h 深藍）
+        function getCustomShiftColor(startTime, endTime) {
+            if (!startTime || !endTime) return '#93c5fd'; // 無法判斷時預設淡藍
+            const [sh, sm] = startTime.replace(/:\d{2}$/, '').split(':').map(Number);
+            const [eh, em] = endTime.replace(/:\d{2}$/, '').split(':').map(Number);
+            const hours = (eh * 60 + em - sh * 60 - sm) / 60;
+            return hours > 4 ? '#2563eb' : '#93c5fd';
         }
 
         function formatDate(date) {
