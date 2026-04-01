@@ -1201,6 +1201,7 @@ const endDate = `${_m === 12 ? _y + 1 : _y}-${String(_m === 12 ? 1 : _m + 1).pad
                             staffName: staffName,
                             shiftId: r.shift_type,
                             shiftName: displayName,
+                            shiftColor: shiftDef ? shiftDef.color : (r.shift_type && r.shift_type.startsWith('custom_') ? '#a78bfa' : '#4b5563'),
                             shiftTime: shiftTime || (r.start_time && r.end_time ? trimSec(r.start_time) + '-' + trimSec(r.end_time) : ''),
                             startTime: trimSec(r.start_time),
                             endTime: trimSec(r.end_time)
@@ -1252,6 +1253,7 @@ data.forEach(r => {
         staffName: staffName,
         shiftId: r.shift_type,
         shiftName: displayName,
+        shiftColor: shiftDef ? shiftDef.color : (r.shift_type && r.shift_type.startsWith('custom_') ? '#a78bfa' : '#4b5563'),
         shiftTime: shiftTime || (r.start_time && r.end_time ? trimSec(r.start_time) + '-' + trimSec(r.end_time) : ''),
         startTime: trimSec(r.start_time),
         endTime: trimSec(r.end_time),
@@ -1279,8 +1281,7 @@ data.forEach(r => {
             
             const schedule = lastMonthSchedules[dateStr];
             if (schedule) {
-                const shift = shifts.find(s => s.id === schedule.shiftId);
-                const shiftInfo = shift ? `${shift.name} (${shift.time})` : schedule.shiftId;
+                const shiftInfo = schedule.shiftName + (schedule.shiftTime ? ` (${schedule.shiftTime})` : '');
                 document.getElementById('overtimeFillShift').innerHTML = `原班別：<strong>${shiftInfo}</strong>`;
             } else {
                 document.getElementById('overtimeFillShift').innerHTML = `<strong style="color:#f59e0b;">臨時上班</strong>（原本無排班）`;
@@ -1327,8 +1328,7 @@ data.forEach(r => {
             const schedule = lastMonthSchedules[currentOvertimeDate];
             let shiftName = '臨時上班';
             if (schedule) {
-                const shift = shifts.find(s => s.id === schedule.shiftId);
-                shiftName = shift ? shift.name : schedule.shiftId;
+                shiftName = schedule.shiftName || schedule.shiftId;
             }
             
             showToast('📤 正在送出...');
@@ -1735,8 +1735,8 @@ data.forEach(r => {
                 // 🆕 三層降級邏輯取得班別名稱和時間
                 let shiftName = '';
                 let shiftTime = '';
-                let shiftColor = '#4b5563';
-                
+                let shiftColor = mySchedule.shiftColor || '#4b5563';
+
                 if (shift) {
                     // 1. 班別存在：使用班別設定
                     shiftName = shift.name;
