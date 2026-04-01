@@ -811,7 +811,7 @@
                             staffName: resolvedName,
                             shiftId: r.shift_type,
                             shiftName: displayShiftName,
-                            shiftColor: shiftDef ? shiftDef.color : '#ff9800',
+                            shiftColor: shiftDef ? shiftDef.color : getCustomShiftColor(r.start_time, r.end_time),
                             shiftTime: shiftTime || (r.start_time && r.end_time ? trimSec(r.start_time) + '-' + trimSec(r.end_time) : ''),
                             startTime: trimSec(r.start_time),
                             endTime: trimSec(r.end_time),
@@ -2569,6 +2569,15 @@ async function calculateAccumulatedDiff(currentStats) {
             await loadScheduleData(getCurrentMonthStr());
             generateCalendar(); 
             showToast('✅ 已更新'); 
+        }
+
+        // 自訂班別顏色：依時數分（≤4h 淡藍 / >4h 深藍）
+        function getCustomShiftColor(startTime, endTime) {
+            if (!startTime || !endTime) return '#7dd3fc';
+            const [sh, sm] = startTime.replace(/:\d{2}$/, '').split(':').map(Number);
+            const [eh, em] = endTime.replace(/:\d{2}$/, '').split(':').map(Number);
+            const hours = (eh * 60 + em - sh * 60 - sm) / 60;
+            return hours > 4 ? '#0284c7' : '#7dd3fc';
         }
 
         function formatDate(date) { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`; }
