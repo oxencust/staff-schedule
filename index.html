@@ -1997,9 +1997,10 @@ async function calculateAccumulatedDiff(currentStats) {
             }
         }
 
-        // 🆕 計算工作日（與 getWorkDays 完全一致的邏輯，但可指定年份的假日）
-        function getWorkDaysForMonth(year, month) {
-            const yearHolidays = holidaysByYear[year] || [];
+        // 🆕 計算工作日（與 getWorkDays 完全一致）
+        // 當前年份直接用全域 holidays；其他年份用 holidaysByYear
+        function getWorkDaysForAccumulated(year, month) {
+            const yearHolidays = (year === currentYear) ? holidays : (holidaysByYear[year] || []);
             let wd = 0;
             const lastDay = new Date(year, month, 0).getDate();
             for (let d = 1; d <= lastDay; d++) {
@@ -2067,8 +2068,15 @@ async function calculateAccumulatedDiff(currentStats) {
                     staffGroups[name].push(r);
                 });
 
-                // 🆕 用含假日的工作日計算（與 updateStats/getWorkDays 完全一致）
-                const workDays = getWorkDaysForMonth(monthInfo.year, monthInfo.month);
+                // 🆕 計算工作日（當前年份用全域 holidays，其他年份用 fetched holidays）
+                const workDays = getWorkDaysForAccumulated(monthInfo.year, monthInfo.month);
+
+                // 建立 shiftId → shift 對照表（含歷史班別）
+                const shiftMap = {};
+                shifts.forEach(s => { if (s.id) shiftMap[s.id] = s; });
+
+                // 去秒數輔助
+                const trimS = t => t ? t.replace(/:\d{2}$/, '') : '';
 
                 for (const sName in staffGroups) {
                     if (!accumulated[sName]) {
@@ -2079,30 +2087,50 @@ async function calculateAccumulatedDiff(currentStats) {
                     let netHours = 0, overtimeH = 0, leaveH = 0;
 
                     records.forEach(r => {
-                        // 計算排班時數
-                        if (r.start_time && r.end_time) {
-                            const sh = parseTimeToMinutes(r.start_time);
-                            const eh = parseTimeToMinutes(r.end_time);
-                            let rawMin = eh - sh;
-                            if (rawMin < 0) rawMin += 1440;
-                            const rawHrs = rawMin / 60;
-                            const breakMin = rawHrs >= 9 ? 60 : rawHrs > 4 ? 30 : 0;
-                            netHours += (rawMin - breakMin) / 60;
+                        const shiftDef = shiftMap[r.shift_type];
+                        const isLeave = shiftDef && (shiftDef.isLeave || shiftDef.is_leave);
+
+                        if (isLeave) {
+                            // ── 請假班別：與 updateStats 一致，預設 8h ──
+                            leaveH += Number(r.leave_hours) || 8;
+                        } else {
+                            // ── 一般班別：用與 updateStats 完全一致的路徑取得工時 ──
+                            let workInfo = { rawHours: 0, breakMinutes: 0, netHours: 0 };
+
+                            if (shiftDef && shiftDef.time) {
+                                // 1. 班別定義有時間 → 用 calculateWorkHours（同 updateStats）
+                                workInfo = calculateWorkHours(shiftDef.time);
+                            } else if (r.start_time && r.end_time) {
+                                // 2. DB 有時間 → 組成 "HH:MM-HH:MM" 格式用 calculateWorkHours
+                                const timeStr = trimS(r.start_time) + '-' + trimS(r.end_time);
+                                workInfo = calculateWorkHours(timeStr);
+                            }
+                            // 如果都沒有時間 → workInfo 為 0（同 updateStats 的 fallback）
+
+                            netHours += workInfo.netHours;
+
+                            // ── 加班：與 updateStats 一致，用 start/end 計算 ──
+                            if (r.overtime_status === '已審核') {
+                                if (r.overtime_start && r.overtime_end) {
+                                    overtimeH += calculateOvertimeHours(trimS(r.overtime_start), trimS(r.overtime_end));
+                                } else {
+                                    overtimeH += Number(r.overtime_hours) || 0;
+                                }
+                            }
+
+                            // ── 請假時數（非假別班但有扣假）──
+                            if (r.leave_hours && Number(r.leave_hours) > 0) {
+                                leaveH += Number(r.leave_hours);
+                            }
                         }
-                        // 🆕 加班只計算已審核的（與 updateStats 一致）
-                        if (r.overtime_status === '已審核') {
-                            overtimeH += Number(r.overtime_hours) || 0;
-                        }
-                        leaveH += Number(r.leave_hours) || 0;
                     });
 
-                    // 取得員工類型
+                    // 取得員工類型（與 updateStats 一致）
                     const staffInfo = staffList.find(s => s.name === sName);
-                    const staffType = staffInfo ? staffInfo.staffType : 'PT';
-                    const requiredHours = staffType === '正職' ? workDays * 8
-                        : staffType === '半薪正職' ? (workDays * 8) / 2
-                        : null;
+                    const staffType = staffInfo ? (staffInfo.staffType || 'PT') : 'PT';
+                    const requiredHours = getRequiredHours(staffType, workDays);
 
+                    // actualHours = netHours + overtime + leaveHours（與 updateStats 的 totalHours + leaveHours 一致）
                     const actualHours = netHours + overtimeH + leaveH;
                     const monthDiff = (requiredHours !== null) ? (actualHours - requiredHours) : 0;
 
