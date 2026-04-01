@@ -2104,10 +2104,40 @@ async function calculateAccumulatedDiff(currentStats) {
                                 // 2. DB 有時間 → 組成 "HH:MM-HH:MM" 格式用 calculateWorkHours
                                 const timeStr = trimS(r.start_time) + '-' + trimS(r.end_time);
                                 workInfo = calculateWorkHours(timeStr);
+                            } else if (r.shift_type) {
+                                // 3. 🆕 從 shift_type 解析時間（GAS4 可能存 shiftName 如 "自訂 14:30-21:30"）
+                                const stMatch = r.shift_type.match(/(\d{1,2}:\d{2})-(\d{1,2}:\d{2})/);
+                                if (stMatch) {
+                                    workInfo = calculateWorkHours(stMatch[0]);
+                                } else {
+                                    // 4. 🆕 從 schedule 全域變數查找（可能只有當前月份）
+                                    const dateSchedule = schedule[r.schedule_date];
+                                    if (dateSchedule) {
+                                        const staffName2 = staffMap[r.staff_id] || r.staff_id;
+                                        const found = dateSchedule.find(s => s.staffName === staffName2);
+                                        if (found) {
+                                            if (found.shiftTime) {
+                                                workInfo = calculateWorkHours(found.shiftTime);
+                                            } else if (found.shiftName) {
+                                                const nm = found.shiftName.match(/(\d{1,2}:\d{2})-(\d{1,2}:\d{2})/);
+                                                if (nm) workInfo = calculateWorkHours(nm[0]);
+                                            }
+                                        }
+                                    }
+                                    // 🔍 無法解析時間，記錄 debug 資訊
+                                    if (workInfo.netHours === 0) {
+                                        console.warn(`⚠️ 累計差異：無法解析時間 [${r.schedule_date}] staff=${r.staff_id} shift_type=${r.shift_type} start=${r.start_time} end=${r.end_time}`);
+                                    }
+                                }
                             }
-                            // 如果都沒有時間 → workInfo 為 0（同 updateStats 的 fallback）
 
-                            netHours += workInfo.netHours;
+                            // ── 請假時數（非假別班但有扣假）── 與 updateStats 一致：先扣再加回
+                            let appliedLeave = 0;
+                            if (r.leave_hours && Number(r.leave_hours) > 0) {
+                                appliedLeave = Number(r.leave_hours);
+                                leaveH += appliedLeave;
+                            }
+                            netHours += (workInfo.netHours - appliedLeave);
 
                             // ── 加班：與 updateStats 一致，用 start/end 計算 ──
                             if (r.overtime_status === '已審核') {
@@ -2116,11 +2146,6 @@ async function calculateAccumulatedDiff(currentStats) {
                                 } else {
                                     overtimeH += Number(r.overtime_hours) || 0;
                                 }
-                            }
-
-                            // ── 請假時數（非假別班但有扣假）──
-                            if (r.leave_hours && Number(r.leave_hours) > 0) {
-                                leaveH += Number(r.leave_hours);
                             }
                         }
                     });
