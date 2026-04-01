@@ -1174,8 +1174,9 @@
             const container = document.getElementById('shiftList');
             if (shifts.length === 0) { container.innerHTML = '<p style="color: #666;">尚無班別設定</p>'; return; }
             
-            const regularShifts = shifts.filter(s => !s.isLeave);
-            const leaveShifts = shifts.filter(s => s.isLeave);
+            // 班別設定只顯示未停用的班別（歷史班別 disabled=true 不顯示）
+            const regularShifts = shifts.filter(s => !s.isLeave && !s.disabled);
+            const leaveShifts = shifts.filter(s => s.isLeave && !s.disabled);
             
             let html = '';
             
@@ -2015,10 +2016,14 @@ async function calculateAccumulatedDiff(currentStats) {
 
                 emptyCount = 0;
 
-                // 按員工分組計算統計
+                // 按員工分組計算統計（去重：同一員工同一天只取一筆）
                 const staffGroups = {};
+                const seen = {};
                 monthData.forEach(r => {
                     const name = staffMap[r.staff_id] || r.staff_id;
+                    const dedupeKey = r.staff_id + '_' + r.schedule_date;
+                    if (seen[dedupeKey]) return; // 跳過重複
+                    seen[dedupeKey] = true;
                     if (!staffGroups[name]) staffGroups[name] = [];
                     staffGroups[name].push(r);
                 });
