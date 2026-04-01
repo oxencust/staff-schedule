@@ -735,11 +735,13 @@
                         if (apiItem.overtimeStatus) existing.overtimeStatus = apiItem.overtimeStatus;
                         if (apiItem.leaveType) existing.leaveType = apiItem.leaveType;
                         if (apiItem.leaveHours) existing.leaveHours = apiItem.leaveHours;
-                        
-                        // 如果是 API 優先模式，也更新班別
-                        if (priority === 'api-priority' && apiItem.shiftId) {
+
+                        // Supabase 為資料來源：始終用 API 的班別資訊更新
+                        if (apiItem.shiftId) {
                             existing.shiftId = apiItem.shiftId;
                             existing.shiftName = apiItem.shiftName;
+                            existing.shiftColor = apiItem.shiftColor;
+                            if (apiItem.shiftTime) existing.shiftTime = apiItem.shiftTime;
                         }
                     } else {
                         // 新增（API 有但 localStorage 沒有）
@@ -809,6 +811,7 @@
                             staffName: resolvedName,
                             shiftId: r.shift_type,
                             shiftName: displayShiftName,
+                            shiftColor: shiftDef ? shiftDef.color : '#ff9800',
                             shiftTime: shiftTime || (r.start_time && r.end_time ? trimSec(r.start_time) + '-' + trimSec(r.end_time) : ''),
                             startTime: trimSec(r.start_time),
                             endTime: trimSec(r.end_time),
@@ -1383,8 +1386,8 @@
     html += '<div class="schedule-list">';
     schedule[dateStr].forEach(item => {
         const shift = shifts.find(s => s.id === item.shiftId);
-        const color = shift ? shift.color : '#999';
-        const shiftName = shift ? shift.name : (item.shiftName || item.shiftId);
+        const color = item.shiftColor || (shift ? shift.color : '#999');
+        const shiftName = item.shiftName || (shift ? shift.name : item.shiftId);
         const isLeave = shift && shift.isLeave;
         const note = item.note ? `（${item.note}）` : '';
         
