@@ -2175,11 +2175,9 @@ data.forEach(r => {
         }
 
         function showConfirmModal() {
-            const currentMonthPrefix = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
-            
+            // 收集所有月份的可上班日期（不限當前月）
             const availableList = Object.keys(availableDates)
                 .filter(dateStr => {
-                    if (!dateStr.startsWith(currentMonthPrefix)) return false;
                     const data = availableDates[dateStr];
                     return data && (data.allDay || (data.shifts && data.shifts.length > 0) || data.customTime);
                 })
@@ -2199,14 +2197,34 @@ data.forEach(r => {
                         }
                         if (parts.length > 0) shiftDisplay = parts.join(', ');
                     }
-                    return { date: dateStr, dayOfWeek, shiftDisplay };
+                    const monthLabel = `${date.getFullYear()}年${date.getMonth() + 1}月`;
+                    return { date: dateStr, dayOfWeek, shiftDisplay, monthLabel };
                 });
-            
-            document.getElementById('modalSummary').textContent = `${currentYear}年${currentMonth + 1}月 共 ${availableList.length} 天可以上班`;
-            document.getElementById('dateList').innerHTML = availableList.length === 0 
-                ? '<div style="text-align: center; padding: 20px; color: #666;">尚未標記任何可上班的日期</div>'
-                : availableList.map(item => `<div class="date-item">${item.date} (週${item.dayOfWeek}) - ${item.shiftDisplay}</div>`).join('');
-            
+
+            // 按月份分組顯示
+            const months = [...new Set(availableList.map(i => i.monthLabel))];
+            const summaryText = months.length > 1
+                ? `共 ${months.length} 個月份，${availableList.length} 天可以上班`
+                : `${months[0] || ''} 共 ${availableList.length} 天可以上班`;
+
+            document.getElementById('modalSummary').textContent = summaryText;
+
+            if (availableList.length === 0) {
+                document.getElementById('dateList').innerHTML = '<div style="text-align: center; padding: 20px; color: #666;">尚未標記任何可上班的日期</div>';
+            } else {
+                let html = '';
+                let lastMonth = '';
+                availableList.forEach(item => {
+                    if (item.monthLabel !== lastMonth) {
+                        if (lastMonth) html += '<div style="height:8px;"></div>';
+                        html += `<div style="font-size:12px;font-weight:600;color:#0369a1;padding:4px 0;border-bottom:1px solid #e2e8f0;margin-bottom:4px;">${item.monthLabel}</div>`;
+                        lastMonth = item.monthLabel;
+                    }
+                    html += `<div class="date-item">${item.date} (週${item.dayOfWeek}) - ${item.shiftDisplay}</div>`;
+                });
+                document.getElementById('dateList').innerHTML = html;
+            }
+
             document.getElementById('modalOverlay').classList.add('show');
         }
 
@@ -2216,13 +2234,10 @@ data.forEach(r => {
             closeConfirmModal();
             if (!API_URL) { showToast('❌ API 未設定'); return; }
             if (!staffName) { showToast('❌ 請從正確的連結進入'); return; }
-            
-            const currentMonthPrefix = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
-            
+
+            // 送出所有月份的可上班日期（不限當前月）
             let availabilityArr = [];
             Object.keys(availableDates).sort().forEach(dateStr => {
-                if (!dateStr.startsWith(currentMonthPrefix)) return;
-                
                 const data = availableDates[dateStr];
                 if (data && (data.allDay || (data.shifts && data.shifts.length > 0) || data.customTime)) {
                     if (data.allDay) {
