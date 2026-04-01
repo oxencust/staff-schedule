@@ -1182,24 +1182,28 @@ const endDate = `${_m === 12 ? _y + 1 : _y}-${String(_m === 12 ? 1 : _m + 1).pad
 
                 if (!error && data) {
                     lastMonthSchedules = {};
+                    const trimSec = t => t ? t.replace(/:\d{2}$/, '') : t;
                     data.forEach(r => {
                         const shiftDef = shifts.find(s => s.id === r.shift_type);
                         let displayName = r.shift_type;
+                        let shiftTime = '';
                         if (shiftDef) {
                             displayName = shiftDef.name;
+                            shiftTime = shiftDef.time || '';
                         } else if (r.shift_type && r.shift_type.startsWith('custom_')) {
                             displayName = '自訂';
                             if (r.start_time && r.end_time) {
-                                displayName = '自訂 ' + r.start_time + '-' + r.end_time;
+                                shiftTime = trimSec(r.start_time) + '-' + trimSec(r.end_time);
+                                displayName = '自訂 ' + shiftTime;
                             }
                         }
                         lastMonthSchedules[r.schedule_date] = {
                             staffName: staffName,
                             shiftId: r.shift_type,
                             shiftName: displayName,
-                            shiftTime: shiftDef ? shiftDef.time : (r.start_time && r.end_time ? r.start_time + '-' + r.end_time : ''),
-                            startTime: r.start_time,
-                            endTime: r.end_time
+                            shiftTime: shiftTime || (r.start_time && r.end_time ? trimSec(r.start_time) + '-' + trimSec(r.end_time) : ''),
+                            startTime: trimSec(r.start_time),
+                            endTime: trimSec(r.end_time)
                         };
                     });
                 }
@@ -1226,16 +1230,21 @@ const endDate = `${_m === 12 ? _y + 1 : _y}-${String(_m === 12 ? 1 : _m + 1).pad
 
                 if (!error && data) {
                     currentMonthSchedules = {};
+                    // 去秒數輔助函式
+                    const trimSec = t => t ? t.replace(/:\d{2}$/, '') : t;
 data.forEach(r => {
     // 解析班別顯示名稱
     const shiftDef = shifts.find(s => s.id === r.shift_type);
     let displayName = r.shift_type;
+    let shiftTime = '';
     if (shiftDef) {
         displayName = shiftDef.name;
+        shiftTime = shiftDef.time || '';
     } else if (r.shift_type && r.shift_type.startsWith('custom_')) {
         displayName = '自訂';
         if (r.start_time && r.end_time) {
-            displayName = '自訂 ' + r.start_time + '-' + r.end_time;
+            shiftTime = trimSec(r.start_time) + '-' + trimSec(r.end_time);
+            displayName = '自訂 ' + shiftTime;
         }
     }
 
@@ -1243,9 +1252,9 @@ data.forEach(r => {
         staffName: staffName,
         shiftId: r.shift_type,
         shiftName: displayName,
-        shiftTime: shiftDef ? shiftDef.time : (r.start_time && r.end_time ? r.start_time + '-' + r.end_time : ''),
-        startTime: r.start_time,
-        endTime: r.end_time,
+        shiftTime: shiftTime || (r.start_time && r.end_time ? trimSec(r.start_time) + '-' + trimSec(r.end_time) : ''),
+        startTime: trimSec(r.start_time),
+        endTime: trimSec(r.end_time),
         overtimeStart: r.overtime_start,
         overtimeEnd: r.overtime_end,
         overtimeStatus: r.overtime_status,
@@ -1515,12 +1524,17 @@ data.forEach(r => {
             try {
                const { data, error } = await sb.from('shifts').select('*');
                 if (!error && data) {
-                    shifts = data;
+                    // Supabase 用 is_leave，前端用 isLeave，統一轉換
+                    shifts = data.map(s => ({
+                        ...s,
+                        isLeave: s.is_leave || false,
+                        leaveType: s.leave_type || ''
+                    }));
 
                     // 🆕 儲存到快取（7 天）
                     setCache(cacheKey, shifts, 7);
 
-                    loadLeaveOptions(data);
+                    loadLeaveOptions(shifts);
                     return shifts;
                 }
             } catch (e) {
@@ -2425,25 +2439,29 @@ const endDate = `${_m === 12 ? _y + 1 : _y}-${String(_m === 12 ? 1 : _m + 1).pad
 
                 // 轉換成原本 schedules 格式以相容下面的統計邏輯
                 const schedules = {};
+                const trimSec = t => t ? t.replace(/:\d{2}$/, '') : t;
                 schedArr.forEach(r => {
                     if (!schedules[r.schedule_date]) schedules[r.schedule_date] = [];
                     const shiftDef = shifts.find(s => s.id === r.shift_type);
                     let displayName = r.shift_type;
+                    let shiftTime = '';
                     if (shiftDef) {
                         displayName = shiftDef.name;
+                        shiftTime = shiftDef.time || '';
                     } else if (r.shift_type && r.shift_type.startsWith('custom_')) {
                         displayName = '自訂';
                         if (r.start_time && r.end_time) {
-                            displayName = '自訂 ' + r.start_time + '-' + r.end_time;
+                            shiftTime = trimSec(r.start_time) + '-' + trimSec(r.end_time);
+                            displayName = '自訂 ' + shiftTime;
                         }
                     }
                     schedules[r.schedule_date].push({
                         staffName: staffName,
                         shiftId: r.shift_type,
                         shiftName: displayName,
-                        shiftTime: shiftDef ? shiftDef.time : (r.start_time && r.end_time ? r.start_time + '-' + r.end_time : ''),
-                        startTime: r.start_time,
-                        endTime: r.end_time,
+                        shiftTime: shiftTime || (r.start_time && r.end_time ? trimSec(r.start_time) + '-' + trimSec(r.end_time) : ''),
+                        startTime: trimSec(r.start_time),
+                        endTime: trimSec(r.end_time),
                         overtimeHours: r.overtime_hours,
                         leaveType: r.leave_type,
                         leaveHours: r.leave_hours
