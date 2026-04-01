@@ -2268,11 +2268,11 @@ data.forEach(r => {
 
         // 自訂班別顏色：依時數分（≤4h 淡藍 / >4h 深藍）
         function getCustomShiftColor(startTime, endTime) {
-            if (!startTime || !endTime) return '#93c5fd'; // 無法判斷時預設淡藍
+            if (!startTime || !endTime) return '#7dd3fc'; // 無法判斷時預設淡藍
             const [sh, sm] = startTime.replace(/:\d{2}$/, '').split(':').map(Number);
             const [eh, em] = endTime.replace(/:\d{2}$/, '').split(':').map(Number);
             const hours = (eh * 60 + em - sh * 60 - sm) / 60;
-            return hours > 4 ? '#2563eb' : '#93c5fd';
+            return hours > 4 ? '#0284c7' : '#7dd3fc';
         }
 
         function formatDate(date) {
