@@ -777,9 +777,17 @@
                     const shiftMap = {};
                     shifts.forEach(s => { if (s.id) shiftMap[s.id] = s; });
 
+                    // 去秒數輔助函式
+                    const trimSec = t => t ? t.replace(/:\d{2}$/, '') : t;
+
                     // 轉換成原本 { "2026-04-01": [{ staffName, shiftId, ... }] } 格式
                     const schedules = {};
                     data.forEach(r => {
+                        // 跳過 staff_id 為 null 的記錄
+                        if (!r.staff_id) return;
+                        const resolvedName = staffMap[r.staff_id];
+                        if (!resolvedName) return; // 找不到對應員工就跳過
+
                         if (!schedules[r.schedule_date]) schedules[r.schedule_date] = [];
 
                         // 解析班別名稱
@@ -792,20 +800,20 @@
                         } else if (r.shift_type && r.shift_type.startsWith('custom_')) {
                             displayShiftName = '自訂';
                             if (r.start_time && r.end_time) {
-                                shiftTime = r.start_time + '-' + r.end_time;
+                                shiftTime = trimSec(r.start_time) + '-' + trimSec(r.end_time);
                                 displayShiftName = '自訂 ' + shiftTime;
                             }
                         }
 
                         schedules[r.schedule_date].push({
-                            staffName: staffMap[r.staff_id] || r.staff_id,
+                            staffName: resolvedName,
                             shiftId: r.shift_type,
                             shiftName: displayShiftName,
-                            shiftTime: shiftTime || (r.start_time && r.end_time ? r.start_time + '-' + r.end_time : ''),
-                            startTime: r.start_time,
-                            endTime: r.end_time,
-                            overtimeStart: r.overtime_start,
-                            overtimeEnd: r.overtime_end,
+                            shiftTime: shiftTime || (r.start_time && r.end_time ? trimSec(r.start_time) + '-' + trimSec(r.end_time) : ''),
+                            startTime: trimSec(r.start_time),
+                            endTime: trimSec(r.end_time),
+                            overtimeStart: trimSec(r.overtime_start),
+                            overtimeEnd: trimSec(r.overtime_end),
                             overtimeStatus: r.overtime_status,
                             overtimeHours: r.overtime_hours,
                             leaveType: r.leave_type,
@@ -1041,7 +1049,12 @@
             try {
                 const { data, error } = await sb.from('shifts').select('*');
                 if (!error && data) {
-                    shifts = data;
+                    // Supabase 用 is_leave，前端用 isLeave，統一轉換
+                    shifts = data.map(s => ({
+                        ...s,
+                        isLeave: s.is_leave || false,
+                        leaveType: s.leave_type || ''
+                    }));
                     setCachedData('shifts_cache', shifts); // 快取
                     renderShiftList();
                     updateLegend();
@@ -1513,15 +1526,11 @@
             
             const stats = {};
             const monthStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
-            
+
+            // 建立 staffList 的 name → staffType 對照（後面按需初始化）
+            const staffTypeMap = {};
             staffList.forEach(staff => {
-                const staffType = staff.staffType || 'PT';
-                const requiredHours = getRequiredHours(staffType, workDays);
-                stats[staff.name] = { 
-                    days: 0, rawHours: 0, breakMinutes: 0, netHours: 0, overtime: 0, 
-                    shifts: {}, break30: 0, break60: 0, leaveHours: 0,
-                    staffType, requiredHours
-                };
+                staffTypeMap[staff.name] = staff.staffType || 'PT';
             });
             
             
@@ -1533,10 +1542,11 @@
                     // 跳過無法對應姓名的記錄（已刪除員工或 null）
                     if (!item.staffName || item.staffName.startsWith('HDB') || item.staffName === 'null') return;
                     if (!stats[item.staffName]) {
+                        const sType = staffTypeMap[item.staffName] || 'PT';
                         stats[item.staffName] = {
                             days: 0, rawHours: 0, breakMinutes: 0, netHours: 0, overtime: 0,
                             shifts: {}, break30: 0, break60: 0, leaveHours: 0,
-                            staffType: 'PT', requiredHours: null
+                            staffType: sType, requiredHours: getRequiredHours(sType, workDays)
                         };
                     }
                     
