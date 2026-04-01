@@ -758,13 +758,14 @@
 
             try {
                 const startDate = monthStr + '-01';
-                const endDate = monthStr + '-31';
+                const [_y, _m] = monthStr.split('-').map(Number);
+const endDate = `${_m === 12 ? _y + 1 : _y}-${String(_m === 12 ? 1 : _m + 1).padStart(2, '0')}-01`;
 
                 const { data, error } = await sb
                     .from('staff_schedules')
                     .select('*')
                     .gte('schedule_date', startDate)
-                    .lte('schedule_date', endDate);
+                    .lt('schedule_date', endDate);
 
                 if (!error && data) {
                     // 轉換成原本 { "2026-04-01": [{ staffName, shiftId, ... }] } 格式
