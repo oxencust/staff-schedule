@@ -759,8 +759,8 @@
 
             try {
                 const startDate = monthStr + '-01';
-                cconst [_y, _m] = monthStr.split('-').map(Number);
-const endDate = `${_m === 12 ? _y + 1 : _y}-${String(_m === 12 ? 1 : _m + 1).padStart(2, '0')}-01`;
+                const [_y, _m] = monthStr.split('-').map(Number);
+                const endDate = `${_m === 12 ? _y + 1 : _y}-${String(_m === 12 ? 1 : _m + 1).padStart(2, '0')}-01`;
 
                 const { data, error } = await sb
                     .from('staff_schedules')
