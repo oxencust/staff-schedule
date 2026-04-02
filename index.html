@@ -933,7 +933,7 @@
             let html = `<table class="staff-table"><thead><tr><th>姓名</th><th>類型</th><th>可上班時間</th><th>總天數</th><th>送出時間</th><th>操作</th></tr></thead><tbody>`;
             staffList.forEach(staff => {
                 const staffType = staff.staffType || 'PT';
-                const typeColor = staffType === '正職' ? '#10b981' : staffType === '半薪正職' ? '#3b82f6' : '#9ca3af';
+                const typeColor = staffType === '正職' ? '#10b981' : (staffType === '半薪正職' || staffType === '半正職') ? '#3b82f6' : '#9ca3af';
                 const typeBadge = `<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;background:${typeColor};color:white;">${staffType}</span>`;
                 html += `<tr>
                     <td data-label="姓名"><strong>${staff.name}</strong></td>
@@ -1503,7 +1503,7 @@
         function getRequiredHours(staffType, workDays) {
             switch (staffType) {
                 case '正職': return workDays * 8;
-                case '半薪正職': return (workDays * 8) / 2;
+                case '半薪正職': case '半正職': return (workDays * 8) / 2;
                 case 'PT': return null;
                 default: return null;
             }
@@ -1704,7 +1704,7 @@ if (s.requiredHours !== null) {
     }
 }
                     
-                    const typeColor = s.staffType === '正職' ? '#10b981' : s.staffType === '半薪正職' ? '#3b82f6' : '#9ca3af';
+                    const typeColor = s.staffType === '正職' ? '#10b981' : (s.staffType === '半薪正職' || s.staffType === '半正職') ? '#3b82f6' : '#9ca3af';
                     const typeBadge = `<span style="font-size:10px;padding:2px 6px;border-radius:3px;background:${typeColor};color:white;margin-left:8px;">${s.staffType}</span>`;
                     
                     html += `<div class="stats-card">
@@ -1819,6 +1819,7 @@ calculateAccumulatedDiff(stats).then(() => {
                             </div>`;
                         
                         // 月度明細（顯示累計值）
+                        console.log(`🔍 [renderStats] ${name}: monthlyDetails=`, JSON.stringify(s.monthlyDetails), 'accComp=', s.accumulatedCompensatory);
                         if (s.monthlyDetails && s.monthlyDetails.length > 0) {
                             // 先按時間正序排列，計算逐月累計
                             const sorted = [...s.monthlyDetails].sort((a, b) => a.year === b.year ? a.month - b.month : a.year - b.year);
@@ -1866,7 +1867,7 @@ calculateAccumulatedDiff(stats).then(() => {
                         }
                     }
                     
-                    const typeColor = s.staffType === '正職' ? '#10b981' : s.staffType === '半薪正職' ? '#3b82f6' : '#9ca3af';
+                    const typeColor = s.staffType === '正職' ? '#10b981' : (s.staffType === '半薪正職' || s.staffType === '半正職') ? '#3b82f6' : '#9ca3af';
                     const typeBadge = `<span style="font-size:10px;padding:2px 6px;border-radius:3px;background:${typeColor};color:white;margin-left:8px;">${s.staffType}</span>`;
                     
                     html += `<div class="stats-card">
@@ -2105,10 +2106,13 @@ async function calculateAccumulatedDiff(currentStats) {
                                             workInfo = { rawHours: hrs, breakMinutes: 0, netHours: hrs };
                                         }
                                     }
-                                    // 🔍 仍無法解析，記錄 debug 資訊
+                                    // 🔍 仍無法解析：忽略已知非班別項目，其餘記錄 debug
                                     if (workInfo.netHours === 0) {
-                                        debugFailed++;
-                                        console.warn(`⚠️ 累計差異：無法解析時間 [${r.schedule_date}] staff=${r.staff_id} shift_type=${r.shift_type} start=${r.start_time} end=${r.end_time}`);
+                                        const knownNonShift = ['開市拜拜','會議','培訓','休息'];
+                                        if (!knownNonShift.some(k => (r.shift_type||'').includes(k))) {
+                                            debugFailed++;
+                                            console.warn(`⚠️ 累計差異：無法解析時間 [${r.schedule_date}] staff=${r.staff_id} shift_type=${r.shift_type} start=${r.start_time} end=${r.end_time}`);
+                                        }
                                     } else { debugParsed++; }
                                 }
                             }
@@ -2158,12 +2162,17 @@ async function calculateAccumulatedDiff(currentStats) {
         accumulatedDiffCache[currentMonthStr] = accumulated;
 
         // 將累計值和月度明細加到當前統計中
+        console.log('🔍 accumulated keys:', Object.keys(accumulated));
+        console.log('🔍 currentStats keys:', Object.keys(currentStats));
         for (const staffName in currentStats) {
             if (accumulated[staffName]) {
                 currentStats[staffName].accumulatedCompensatory = accumulated[staffName].compensatoryDays;
                 currentStats[staffName].monthlyDetails = accumulated[staffName].monthlyDetails.filter(item => {
                     return !(item.year === currentYear && item.month === currentMonth + 1);
                 });
+                console.log(`🔍 ${staffName}: set monthlyDetails (${currentStats[staffName].monthlyDetails.length} items), accComp=${currentStats[staffName].accumulatedCompensatory}`);
+            } else {
+                console.log(`⚠️ ${staffName}: NOT found in accumulated`);
             }
         }
 
