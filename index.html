@@ -1654,27 +1654,30 @@ if (s.requiredHours !== null) {
             <span class="stats-value" style="color: ${accDiffColor}; font-weight: 700; font-size: 16px;">${accDiffSign}${accumulatedDiff.toFixed(1)} 小時</span>
         </div>`;
     
-    // 🆕 月度明細展開區域
+    // 🆕 月度明細展開區域（顯示累計值）
     if (s.monthlyDetails && s.monthlyDetails.length > 0) {
+        // 先按時間正序排列，計算逐月累計
+        const sorted = [...s.monthlyDetails].sort((a, b) => a.year === b.year ? a.month - b.month : a.year - b.year);
+        let runningTotal = 0;
+        sorted.forEach(item => { runningTotal += item.diff; item.cumulative = runningTotal; });
+
         // 按年度分組
         const yearlyGroups = {};
-        s.monthlyDetails.forEach(item => {
-            if (!yearlyGroups[item.year]) {
-                yearlyGroups[item.year] = [];
-            }
+        sorted.forEach(item => {
+            if (!yearlyGroups[item.year]) yearlyGroups[item.year] = [];
             yearlyGroups[item.year].push(item);
         });
-        
-        // 生成年度摘要
+
         let yearlyHtml = '';
-        const sortedYears = Object.keys(yearlyGroups).sort((a, b) => b - a);  // 降序排列（最新年份在前）
-        
+        const sortedYears = Object.keys(yearlyGroups).sort((a, b) => b - a);
+
         sortedYears.forEach(year => {
             const yearMonths = yearlyGroups[year];
-            const yearTotal = yearMonths.reduce((sum, m) => sum + m.diff, 0);
-            const yearColor = yearTotal > 0 ? '#10b981' : (yearTotal < 0 ? '#ef4444' : '#6b7280');
-            const yearSign = yearTotal > 0 ? '+' : '';
-            
+            // 年度標題顯示該年最後一個月的累計值
+            const yearCumulative = yearMonths[yearMonths.length - 1].cumulative;
+            const yearColor = yearCumulative > 0 ? '#10b981' : (yearCumulative < 0 ? '#ef4444' : '#6b7280');
+            const yearSign = yearCumulative > 0 ? '+' : '';
+
             yearlyHtml += `
                 <div class="year-summary" style="background:#f9fafb;padding:8px 10px;border-radius:6px;margin:4px -10px;">
                     <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="toggleMonthlyDetails('${name}', ${year})">
@@ -1682,21 +1685,21 @@ if (s.requiredHours !== null) {
                             <span style="font-weight:600;font-size:12px;color:#666;">📅 ${year}年明細</span>
                             <span id="toggle-icon-${name}-${year}" style="font-size:10px;color:#999;">▼</span>
                         </div>
-                        <span style="font-weight:700;color:${yearColor};font-size:13px;">${yearSign}${yearTotal.toFixed(1)}h</span>
+                        <span style="font-weight:700;color:${yearColor};font-size:13px;">${yearSign}${yearCumulative.toFixed(1)}h</span>
                     </div>
                     <div id="monthly-${name}-${year}" class="monthly-details" style="display:none;margin-top:8px;padding-top:8px;border-top:1px dashed #ddd;">
-                        ${yearMonths.sort((a, b) => b.month - a.month).map(m => {
-                            const mColor = m.diff > 0 ? '#10b981' : (m.diff < 0 ? '#ef4444' : '#6b7280');
-                            const mSign = m.diff > 0 ? '+' : '';
+                        ${[...yearMonths].sort((a, b) => b.month - a.month).map(m => {
+                            const mColor = m.cumulative > 0 ? '#10b981' : (m.cumulative < 0 ? '#ef4444' : '#6b7280');
+                            const mSign = m.cumulative > 0 ? '+' : '';
                             return `<div style="display:flex;justify-content:space-between;font-size:11px;padding:3px 0;">
                                 <span style="color:#666;">${m.month}月</span>
-                                <span style="color:${mColor};font-weight:600;">${mSign}${m.diff.toFixed(1)}h</span>
+                                <span style="color:${mColor};font-weight:600;">${mSign}${m.cumulative.toFixed(1)}h</span>
                             </div>`;
                         }).join('')}
                     </div>
                 </div>`;
         });
-        
+
         diffHtml += yearlyHtml;
     }
 }
@@ -1815,25 +1818,28 @@ calculateAccumulatedDiff(stats).then(() => {
                                 <span class="stats-value" style="color: ${accDiffColor}; font-weight: 700; font-size: 16px;">${accDiffSign}${accumulatedDiff.toFixed(1)} 小時</span>
                             </div>`;
                         
-                        // 月度明細
+                        // 月度明細（顯示累計值）
                         if (s.monthlyDetails && s.monthlyDetails.length > 0) {
+                            // 先按時間正序排列，計算逐月累計
+                            const sorted = [...s.monthlyDetails].sort((a, b) => a.year === b.year ? a.month - b.month : a.year - b.year);
+                            let runningTotal = 0;
+                            sorted.forEach(item => { runningTotal += item.diff; item.cumulative = runningTotal; });
+
                             const yearlyGroups = {};
-                            s.monthlyDetails.forEach(item => {
-                                if (!yearlyGroups[item.year]) {
-                                    yearlyGroups[item.year] = [];
-                                }
+                            sorted.forEach(item => {
+                                if (!yearlyGroups[item.year]) yearlyGroups[item.year] = [];
                                 yearlyGroups[item.year].push(item);
                             });
-                            
+
                             let yearlyHtml = '';
                             const sortedYears = Object.keys(yearlyGroups).sort((a, b) => b - a);
-                            
+
                             sortedYears.forEach(year => {
                                 const yearMonths = yearlyGroups[year];
-                                const yearTotal = yearMonths.reduce((sum, m) => sum + m.diff, 0);
-                                const yearColor = yearTotal > 0 ? '#10b981' : (yearTotal < 0 ? '#ef4444' : '#6b7280');
-                                const yearSign = yearTotal > 0 ? '+' : '';
-                                
+                                const yearCumulative = yearMonths[yearMonths.length - 1].cumulative;
+                                const yearColor = yearCumulative > 0 ? '#10b981' : (yearCumulative < 0 ? '#ef4444' : '#6b7280');
+                                const yearSign = yearCumulative > 0 ? '+' : '';
+
                                 yearlyHtml += `
                                     <div class="year-summary" style="background:#f9fafb;padding:8px 10px;border-radius:6px;margin:4px -10px;">
                                         <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="toggleMonthlyDetails('${name}', ${year})">
@@ -1841,21 +1847,21 @@ calculateAccumulatedDiff(stats).then(() => {
                                                 <span style="font-weight:600;font-size:12px;color:#666;">📅 ${year}年明細</span>
                                                 <span id="toggle-icon-${name}-${year}" style="font-size:10px;color:#999;">▼</span>
                                             </div>
-                                            <span style="font-weight:700;color:${yearColor};font-size:13px;">${yearSign}${yearTotal.toFixed(1)}h</span>
+                                            <span style="font-weight:700;color:${yearColor};font-size:13px;">${yearSign}${yearCumulative.toFixed(1)}h</span>
                                         </div>
                                         <div id="monthly-${name}-${year}" class="monthly-details" style="display:none;margin-top:8px;padding-top:8px;border-top:1px dashed #ddd;">
-                                            ${yearMonths.sort((a, b) => b.month - a.month).map(m => {
-                                                const mColor = m.diff > 0 ? '#10b981' : (m.diff < 0 ? '#ef4444' : '#6b7280');
-                                                const mSign = m.diff > 0 ? '+' : '';
+                                            ${[...yearMonths].sort((a, b) => b.month - a.month).map(m => {
+                                                const mColor = m.cumulative > 0 ? '#10b981' : (m.cumulative < 0 ? '#ef4444' : '#6b7280');
+                                                const mSign = m.cumulative > 0 ? '+' : '';
                                                 return `<div style="display:flex;justify-content:space-between;font-size:11px;padding:3px 0;">
                                                     <span style="color:#666;">${m.month}月</span>
-                                                    <span style="color:${mColor};font-weight:600;">${mSign}${m.diff.toFixed(1)}h</span>
+                                                    <span style="color:${mColor};font-weight:600;">${mSign}${m.cumulative.toFixed(1)}h</span>
                                                 </div>`;
                                             }).join('')}
                                         </div>
                                     </div>`;
                             });
-                            
+
                             diffHtml += yearlyHtml;
                         }
                     }
