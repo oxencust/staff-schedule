@@ -1962,33 +1962,16 @@ async function calculateAccumulatedDiff(currentStats) {
     try {
         let accumulated = {};
 
-        // 計算 12 個月前的起始日期
-        const fromDate = new Date(currentYear, currentMonth - 12, 1);
-        const fromStr = `${fromDate.getFullYear()}-${String(fromDate.getMonth() + 1).padStart(2, '0')}-01`;
+        // 🆕 從當年1月開始計算到上個月
+        const fromStr = `${currentYear}-01-01`;
         const toDate = new Date(currentYear, currentMonth, 0); // 上個月最後一天
         const toStr = `${toDate.getFullYear()}-${String(toDate.getMonth() + 1).padStart(2, '0')}-${String(toDate.getDate()).padStart(2, '0')}`;
 
-        // 🆕 按年份載入假日（當前年份直接複用全域 holidays，其他年份 fetch）
-        const holidaysByYear = {};
-        holidaysByYear[currentYear] = holidays; // 複用已載入的全域變數，確保一致
+        console.log(`📅 累計差異查詢範圍：${fromStr} ～ ${toStr}`);
 
-        const yearsNeeded = new Set();
-        for (let i = 1; i <= 12; i++) {
-            const d = new Date(currentYear, currentMonth - i, 1);
-            yearsNeeded.add(d.getFullYear());
-        }
-        for (const yr of yearsNeeded) {
-            if (!holidaysByYear[yr]) {
-                try {
-                    const fetched = await fetchHolidays(yr); // 複用同一個 fetchHolidays 函數
-                    holidaysByYear[yr] = fetched;
-                    console.log(`📅 已載入 ${yr} 年假日：${fetched.length} 筆`);
-                } catch (e) {
-                    console.warn(`⚠️ 載入 ${yr} 年假日失敗`, e);
-                    holidaysByYear[yr] = [];
-                }
-            }
-        }
+        // 當年假日直接複用全域 holidays
+        const holidaysByYear = {};
+        holidaysByYear[currentYear] = holidays;
 
         // 🆕 計算工作日（與 getWorkDays 完全一致）
         // 當前年份直接用全域 holidays；其他年份用 holidaysByYear
@@ -2007,7 +1990,7 @@ async function calculateAccumulatedDiff(currentStats) {
             return wd;
         }
 
-        // 一次查詢 12 個月的排班資料（設定足夠大的 limit，避免 Supabase 預設 1000 筆截斷）
+        // 一次查詢當年排班資料（設定足夠大的 limit，避免 Supabase 預設 1000 筆截斷）
         const { data: allSchedules, error } = await sb
             .from('staff_schedules')
             .select('*')
@@ -2015,17 +1998,18 @@ async function calculateAccumulatedDiff(currentStats) {
             .lte('schedule_date', toStr)
             .limit(10000);
 
+        console.log(`📊 查詢到 ${allSchedules ? allSchedules.length : 0} 筆排班資料`);
+
         if (error || !allSchedules || allSchedules.length === 0) {
-            console.log('⏸️ 無歷史排班資料');
+            console.log('⏸️ 無歷史排班資料', error);
         } else {
-            // 按月份分組
+            // 🆕 從1月到上個月（currentMonth 是 0-based，所以 currentMonth = 當前月份的前一個月 index）
             const monthsToCheck = [];
-            for (let i = 1; i <= 12; i++) {
-                const checkDate = new Date(currentYear, currentMonth - i, 1);
+            for (let m = 1; m <= currentMonth; m++) {
                 monthsToCheck.push({
-                    year: checkDate.getFullYear(),
-                    month: checkDate.getMonth() + 1,
-                    monthStr: `${checkDate.getFullYear()}-${String(checkDate.getMonth() + 1).padStart(2, '0')}`
+                    year: currentYear,
+                    month: m,
+                    monthStr: `${currentYear}-${String(m).padStart(2, '0')}`
                 });
             }
 
@@ -2033,22 +2017,14 @@ async function calculateAccumulatedDiff(currentStats) {
             const staffMap = {};
             staffList.forEach(s => { if (s.id) staffMap[s.id] = s.name; });
 
-            let emptyCount = 0;
-
             for (const monthInfo of monthsToCheck) {
                 const prefix = monthInfo.monthStr;
                 const monthData = allSchedules.filter(r => r.schedule_date && r.schedule_date.startsWith(prefix));
 
                 if (monthData.length === 0) {
-                    emptyCount++;
-                    if (emptyCount >= 2) {
-                        console.log(`⏸️ 累計差異計算停止於 ${prefix}（連續 ${emptyCount} 個月無資料）`);
-                        break;
-                    }
+                    console.log(`⏸️ ${prefix} 無排班資料，跳過`);
                     continue;
                 }
-
-                emptyCount = 0;
 
                 // 按員工分組計算統計（去重：同一員工同一天只取一筆）
                 const staffGroups = {};
@@ -2079,6 +2055,7 @@ async function calculateAccumulatedDiff(currentStats) {
 
                     const records = staffGroups[sName];
                     let netHours = 0, overtimeH = 0, leaveH = 0;
+                    let debugParsed = 0, debugFailed = 0;
 
                     records.forEach(r => {
                         const shiftDef = shiftMap[r.shift_type];
@@ -2094,10 +2071,12 @@ async function calculateAccumulatedDiff(currentStats) {
                             if (shiftDef && shiftDef.time) {
                                 // 1. 班別定義有時間 → 用 calculateWorkHours（同 updateStats）
                                 workInfo = calculateWorkHours(shiftDef.time);
+                                debugParsed++;
                             } else if (r.start_time && r.end_time) {
                                 // 2. DB 有時間 → 組成 "HH:MM-HH:MM" 格式用 calculateWorkHours
                                 const timeStr = trimS(r.start_time) + '-' + trimS(r.end_time);
                                 workInfo = calculateWorkHours(timeStr);
+                                debugParsed++;
                             } else if (r.shift_type) {
                                 // 3. 🆕 從 shift_type 解析時間（GAS4 可能存 shiftName 如 "自訂 14:30-21:30"）
                                 const stMatch = r.shift_type.match(/(\d{1,2}:\d{2})-(\d{1,2}:\d{2})/);
@@ -2128,8 +2107,9 @@ async function calculateAccumulatedDiff(currentStats) {
                                     }
                                     // 🔍 仍無法解析，記錄 debug 資訊
                                     if (workInfo.netHours === 0) {
+                                        debugFailed++;
                                         console.warn(`⚠️ 累計差異：無法解析時間 [${r.schedule_date}] staff=${r.staff_id} shift_type=${r.shift_type} start=${r.start_time} end=${r.end_time}`);
-                                    }
+                                    } else { debugParsed++; }
                                 }
                             }
 
@@ -2160,6 +2140,9 @@ async function calculateAccumulatedDiff(currentStats) {
                     // actualHours = netHours + overtime + leaveHours（與 updateStats 的 totalHours + leaveHours 一致）
                     const actualHours = netHours + overtimeH + leaveH;
                     const monthDiff = (requiredHours !== null) ? (actualHours - requiredHours) : 0;
+
+                    // 🔍 DEBUG：輸出每月每人的計算明細
+                    console.log(`📊 [${prefix}] ${sName}: type=${staffType} | records=${records.length} parsed=${debugParsed} failed=${debugFailed} | net=${netHours.toFixed(1)} ot=${overtimeH.toFixed(1)} leave=${leaveH.toFixed(1)} actual=${actualHours.toFixed(1)} required=${requiredHours} diff=${monthDiff.toFixed(1)}`);
 
                     accumulated[sName].compensatoryDays += monthDiff;
                     accumulated[sName].monthlyDetails.push({
