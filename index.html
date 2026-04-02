@@ -769,11 +769,17 @@
 
                     // 轉換成原本 { "2026-04-01": [{ staffName, shiftId, ... }] } 格式
                     const schedules = {};
+                    const apiSeen = {};  // 🆕 去重：同一員工同一天只取一筆
                     data.forEach(r => {
                         // 跳過 staff_id 為 null 的記錄
                         if (!r.staff_id) return;
                         const resolvedName = staffMap[r.staff_id];
                         if (!resolvedName) return; // 找不到對應員工就跳過
+
+                        // 🆕 去重
+                        const dk = r.staff_id + '_' + r.schedule_date;
+                        if (apiSeen[dk]) return;
+                        apiSeen[dk] = true;
 
                         if (!schedules[r.schedule_date]) schedules[r.schedule_date] = [];
 
@@ -1994,12 +2000,18 @@ async function calculateAccumulatedDiff(currentStats) {
 
             // ✅ 用與 updateStats 完全一致的邏輯計算每位員工的統計
             const monthStats = {};
+            const seen = {};  // 🆕 去重：同一員工同一天只算一次
             for (const dateStr in monthSchedule) {
                 if (!dateStr.startsWith(monthInfo.monthStr)) continue;
                 const daySchedule = monthSchedule[dateStr];
 
                 daySchedule.forEach(item => {
                     if (!item.staffName || item.staffName.startsWith('HDB') || item.staffName === 'null') return;
+
+                    // 🆕 去重檢查
+                    const dedupeKey = item.staffName + '_' + dateStr;
+                    if (seen[dedupeKey]) return;
+                    seen[dedupeKey] = true;
 
                     // 只計算正職
                     const sInfo = staffList.find(s => s.name === item.staffName);
