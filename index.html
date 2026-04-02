@@ -2118,7 +2118,15 @@ async function calculateAccumulatedDiff(currentStats) {
                                             }
                                         }
                                     }
-                                    // 🔍 無法解析時間，記錄 debug 資訊
+                                    // 5. 🆕 從 shift_type 括號中提取時數（如 "13午班(5)" → 5h, "930早班(7)" → 7h）
+                                    if (workInfo.netHours === 0) {
+                                        const hoursMatch = r.shift_type.match(/\((\d+\.?\d*)\)/);
+                                        if (hoursMatch) {
+                                            const hrs = parseFloat(hoursMatch[1]);
+                                            workInfo = { rawHours: hrs, breakMinutes: 0, netHours: hrs };
+                                        }
+                                    }
+                                    // 🔍 仍無法解析，記錄 debug 資訊
                                     if (workInfo.netHours === 0) {
                                         console.warn(`⚠️ 累計差異：無法解析時間 [${r.schedule_date}] staff=${r.staff_id} shift_type=${r.shift_type} start=${r.start_time} end=${r.end_time}`);
                                     }
