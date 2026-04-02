@@ -396,7 +396,6 @@
             <div class="settings-panel">
                 <h3>👥 員工列表</h3>
                 <div style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
-                    <button class="btn btn-add" onclick="showAddStaffModal()">➕ 新增員工</button>
                     <button class="btn btn-add" onclick="showTypeManagerModal()">⚙️ 管理類型</button>
                 </div>
                 <div id="staffListContainer"><div class="loading"><div class="spinner"></div>載入中...</div></div>
@@ -468,21 +467,6 @@
                 </div>
             </div>
             
-        </div>
-    </div>
-
-    <div class="modal-overlay" id="addStaffModal">
-        <div class="modal">
-            <h3>➕ 新增員工</h3>
-            <div class="form-group"><label>員工姓名</label><input type="text" id="newStaffName" placeholder="請輸入姓名"></div>
-            <div class="form-group">
-                <label>員工類型</label>
-                <select id="newStaffType"></select>
-            </div>
-            <div class="modal-buttons">
-                <button class="btn btn-secondary" onclick="closeModal('addStaffModal')">取消</button>
-                <button class="btn btn-primary" onclick="addStaff()">新增</button>
-            </div>
         </div>
     </div>
 
@@ -923,9 +907,9 @@
                 return;
             }
             
-            // 從 Supabase 載入
+            // 從 Supabase 載入（排除老闆和封存員工）
             try {
-                const { data, error } = await sb.from('staff').select('*');
+                const { data, error } = await sb.from('staff').select('*').neq('staff_type', '老闆').neq('status', '封存');
                 if (!error && data) {
                     staffList = data.map(s => ({
                         name: s.name,
@@ -946,7 +930,7 @@
         function renderStaffList() {
             const container = document.getElementById('staffListContainer');
             if (staffList.length === 0) { container.innerHTML = '<p style="color: #666; padding: 20px;">尚無員工</p>'; return; }
-            let html = `<table class="staff-table"><thead><tr><th>姓名</th><th>類型</th><th>排班連結</th><th>可上班時間</th><th>總天數</th><th>送出時間</th><th>操作</th></tr></thead><tbody>`;
+            let html = `<table class="staff-table"><thead><tr><th>姓名</th><th>類型</th><th>可上班時間</th><th>總天數</th><th>送出時間</th><th>操作</th></tr></thead><tbody>`;
             staffList.forEach(staff => {
                 const staffType = staff.staffType || 'PT';
                 const typeColor = staffType === '正職' ? '#10b981' : staffType === '半薪正職' ? '#3b82f6' : '#9ca3af';
@@ -954,15 +938,11 @@
                 html += `<tr>
                     <td data-label="姓名"><strong>${staff.name}</strong></td>
                     <td data-label="類型">${typeBadge}</td>
-                    <td data-label="排班連結"><a href="${staff.link}" target="_blank" class="staff-link">${staff.link}</a><button class="copy-btn" onclick="copyLink('${staff.link}')">複製</button></td>
                     <td data-label="可上班時間" class="availability-text">${staff.availability || '尚未填寫'}</td>
                     <td data-label="總天數" class="total-days">${staff.totalDays || 0}</td>
                     <td data-label="送出時間" class="submit-time">${formatDateTime(staff.submitTime)}</td>
                     <td data-label="" class="action-cell">
-                        <div style="display:flex;gap:8px;">
-                            <button class="btn btn-secondary" style="font-size:11px;padding:4px 10px;" onclick="editStaffType('${staff.name}', '${staffType}')">編輯</button>
-                            <button class="btn btn-secondary" style="font-size:11px;padding:4px 10px;color:#ef4444;" onclick="deleteStaff('${staff.name}')">刪除</button>
-                        </div>
+                        <button class="btn btn-secondary" style="font-size:11px;padding:4px 10px;" onclick="editStaffType('${staff.name}', '${staffType}')">編輯類型</button>
                     </td>
                 </tr>`;
             });
@@ -970,48 +950,13 @@
             container.innerHTML = html;
         }
 
-        function showAddStaffModal() { 
-            document.getElementById('newStaffName').value = ''; 
-            document.getElementById('newStaffType').value = 'PT';
-            document.getElementById('addStaffModal').classList.add('show'); 
+        function showAddStaffModal() {
+            // 已移至營運人員管理系統
+            showToast('請至營運人員管理新增員工');
         }
         function closeModal(modalId) { document.getElementById(modalId).classList.remove('show'); }
 
-        async function addStaff() {
-            const name = document.getElementById('newStaffName').value.trim();
-            const staffType = document.getElementById('newStaffType').value;
-            if (!name) { showToast('請輸入員工姓名'); return; }
-            try {
-                showToast('⏳ 新增中...');
-                // ── 1. 產生 ID ──
-                const yearPrefix = 'HDB' + String(new Date().getFullYear()).substring(2);
-                const { data: maxIdData } = await sb.from('staff').select('id').like('id', yearPrefix + '%').order('id', { ascending: false }).limit(1);
-                let nextSeq = 1;
-                if (maxIdData && maxIdData.length > 0) {
-                    const seqNum = parseInt(maxIdData[0].id.substring(yearPrefix.length), 10);
-                    if (!isNaN(seqNum)) nextSeq = seqNum + 1;
-                }
-                const newId = yearPrefix + String(nextSeq).padStart(5, '0');
-
-                // ── 2. 主寫入：Supabase ──
-                const { data: inserted, error } = await sb.from('staff').insert({ id: newId, name, staff_type: staffType }).select();
-                if (error) { showToast('❌ 新增失敗：' + error.message); return; }
-                if (!inserted || inserted.length === 0) { showToast('❌ 新增失敗：資料未寫入（RLS 權限問題）'); return; }
-
-                clearCache('staff_cache');
-                showToast('✅ 員工已新增');
-                closeModal('addStaffModal');
-
-                // ── 3. GAS callback ──
-                if (API_URL) {
-                    try {
-                        await fetch(API_URL + '?action=addStaff&data=' + encodeURIComponent(JSON.stringify({ name, staffType, id: newId, source: 'supabase_frontend' })));
-                    } catch(gasErr) { console.warn('⚠️ GAS 回寫失敗', gasErr); }
-                }
-
-                await loadStaff();
-            } catch (e) { showToast('❌ 新增失敗：' + e.message); }
-        }
+        // addStaff 已移至營運人員管理系統，排班系統不再新增員工
 
         function editStaffType(name, currentType) {
             document.getElementById('editStaffName').value = name;
@@ -1044,27 +989,27 @@
             } catch (e) { showToast('❌ 更新失敗：' + e.message); }
         }
 
-        async function deleteStaff(name) {
-            if (!confirm(`確定要刪除「${name}」嗎？`)) return;
+        async function archiveStaff(name) {
+            if (!confirm(`確定要封存「${name}」嗎？封存後不會出現在排班列表中。`)) return;
             try {
-                // ── 1. 主寫入：Supabase ──
+                // ── 1. 主寫入：Supabase（設 status='封存'，不刪除資料）──
                 const staff = staffList.find(s => s.name === name);
                 if (!staff || !staff.id) { showToast('❌ 找不到員工'); return; }
-                const { error } = await sb.from('staff').delete().eq('id', staff.id);
-                if (error) { showToast('❌ 刪除失敗：' + error.message); return; }
+                const { error } = await sb.from('staff').update({ status: '封存' }).eq('id', staff.id);
+                if (error) { showToast('❌ 封存失敗：' + error.message); return; }
 
                 clearCache('staff_cache');
-                showToast('✅ 員工已刪除');
+                showToast('✅ 員工已封存');
 
                 // ── 2. GAS callback ──
                 if (API_URL) {
                     try {
-                        await fetch(API_URL + '?action=deleteStaff&name=' + encodeURIComponent(name) + '&source=supabase_frontend');
+                        await fetch(API_URL + '?action=archiveStaff&data=' + encodeURIComponent(JSON.stringify({ name, status: '封存', source: 'supabase_frontend' })));
                     } catch(gasErr) { console.warn('⚠️ GAS 回寫失敗', gasErr); }
                 }
 
                 await loadStaff();
-            } catch (e) { showToast('❌ 刪除失敗：' + e.message); }
+            } catch (e) { showToast('❌ 封存失敗：' + e.message); }
         }
 
         function copyLink(link) { navigator.clipboard.writeText(link).then(() => showToast('✅ 已複製連結')); }
@@ -1987,7 +1932,7 @@ function parseTimeToMinutes(timeStr) {
  * ⚡ 計算累計差異（優化版：使用快取）
  */
 async function calculateAccumulatedDiff(currentStats) {
-    if (!API_URL) return;
+    if (!sb) return; // 只需確認 Supabase client 已初始化
 
     const currentMonthStr = getCurrentMonthStr();
 
@@ -2056,12 +2001,13 @@ async function calculateAccumulatedDiff(currentStats) {
             return wd;
         }
 
-        // 一次查詢 12 個月的排班資料
+        // 一次查詢 12 個月的排班資料（設定足夠大的 limit，避免 Supabase 預設 1000 筆截斷）
         const { data: allSchedules, error } = await sb
             .from('staff_schedules')
             .select('*')
             .gte('schedule_date', fromStr)
-            .lte('schedule_date', toStr);
+            .lte('schedule_date', toStr)
+            .limit(10000);
 
         if (error || !allSchedules || allSchedules.length === 0) {
             console.log('⏸️ 無歷史排班資料');
@@ -2278,7 +2224,7 @@ async function calculateAccumulatedDiff(currentStats) {
             const grid = document.getElementById('staffShiftGrid');
             
             if (staffList.length === 0) { 
-                grid.innerHTML = '<p style="color:#666;padding:10px;">尚無員工資料，請先新增員工</p>'; 
+                grid.innerHTML = '<p style="color:#666;padding:10px;">尚無員工資料，請至營運人員管理新增員工</p>'; 
             } else {
                 let html = '';
                 staffList.forEach(staff => {
