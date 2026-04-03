@@ -856,17 +856,19 @@
             if (uidParam) {
                 try {
                     const result = await callEdge('identifyStaff', { lineUid: uidParam });
-                    if (result && result.id) {
-                        staffId = result.id;
-                        if (!staffName) staffName = result.name;
+                    const d = result.data || result;
+                    if (d && d.id) {
+                        staffId = d.id;
+                        if (!staffName) staffName = d.name;
                     }
                 } catch(e) { console.error('查詢員工失敗', e); }
             }
             // 向下相容：用 name 查 id
             if (!staffId && staffName) {
                 try {
-                    const result = await callEdge('identifyStaff', { name: staffName });
-                    if (result && result.id) staffId = result.id;
+                    const result = await callEdge('identifyStaff', { staffName });
+                    const d = result.data || result;
+                    if (d && d.id) staffId = d.id;
                 } catch(e) { console.error('查詢員工失敗', e); }
             }
 
@@ -917,7 +919,7 @@
             
             try {
                 const year = new Date().getFullYear();
-                const result = await callEdge('getMyLeaves', { staffName, year });
+                const result = await callEdge('getMyLeaves', { staffName, yearStart: year + '-01-01', yearEnd: year + '-12-31' });
                 const data = result.data || result;
 
                 if (data) {
@@ -2659,7 +2661,8 @@ const endDate = `${_m === 12 ? _y + 1 : _y}-${String(_m === 12 ? 1 : _m + 1).pad
        async function getMyStaffInfo() {
             if (!staffName) return null;
             try {
-                const result = await callEdge('identifyStaff', { name: staffName });
+                const result = await callEdge('identifyStaff', { staffName });
+                if (result && result.data) return result.data;
                 if (result) return result;
             } catch (e) {
                 console.error('取得員工資訊失敗:', e);
