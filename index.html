@@ -375,7 +375,7 @@
             .staff-shift-row .staff-name { font-size: 11px; }
         }
     </style>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- supabase-js CDN 已移除，改用 Edge Function -->
 </head>
 <body>
     <nav class="navbar">
@@ -526,10 +526,16 @@
             });
         }
        // ============ 設定區（請在這裡修改）============
-        const API_URL = 'https://script.google.com/macros/s/AKfycbzfpaCZKS3yPT9_1k5QpY8V01xPJA8ERPjNM59e0ZSLEdHpUJzKYmcCoUhPOqrMr6KOdg/exec';
-        const SUPABASE_URL = 'https://mnjilhpztnowaplggvkk.supabase.co';
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1uamlsaHB6dG5vd2FwbGdndmtrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU3MDA0ODYsImV4cCI6MjA4MTI3NjQ4Nn0.X3e9DF3iT2KUR9ma3_Ins01vG607R155v0xia8hO_Qg';
-        const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        const EDGE_FUNCTION_URL = 'https://mnjilhpztnowaplggvkk.supabase.co/functions/v1/schedule-api';
+        async function callEdge(action, params = {}) {
+            const res = await fetch(EDGE_FUNCTION_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action, ...params })
+            });
+            if (!res.ok) throw new Error('Edge Function error: ' + res.status);
+            return res.json();
+        }
 
         async function retryFetch(url, options, maxRetries = 2) {
             for (let i = 0; i <= maxRetries; i++) {
@@ -748,14 +754,10 @@
                 const [_y, _m] = monthStr.split('-').map(Number);
                 const endDate = `${_m === 12 ? _y + 1 : _y}-${String(_m === 12 ? 1 : _m + 1).padStart(2, '0')}-01`;
 
-                const { data, error } = await sb
-                    .from('staff_schedules')
-                    .select('*')
-                    .gte('schedule_date', startDate)
-                    .lt('schedule_date', endDate)
-                    .limit(5000);
+                const result = await callEdge('getScheduleMonth', { startDate, endDate });
+                const data = result.data || result;
 
-                if (!error && data) {
+                if (data) {
                     // 建立 staffId → name 對照表
                     const staffMap = {};
                     staffList.forEach(s => { if (s.id) staffMap[s.id] = s.name; });
@@ -826,9 +828,9 @@
         async function updateApiStatus() {
             const status = document.getElementById('apiStatus');
             try {
-                const { data, error } = await sb.from('shifts').select('id').limit(1);
-                if (!error) {
-                    status.textContent = '✓ 已連線 (Supabase)';
+                const result = await callEdge('checkApiStatus');
+                if (result) {
+                    status.textContent = '✓ 已連線 (Edge Function)';
                     status.classList.add('connected');
                     status.classList.remove('disconnected');
                     return;
@@ -914,10 +916,11 @@
                 return;
             }
             
-            // 從 Supabase 載入（排除老闆和封存員工）
+            // 從 Edge Function 載入（排除老闆和封存員工）
             try {
-                const { data, error } = await sb.from('staff').select('*').neq('staff_type', '老闆').neq('status', '封存');
-                if (!error && data) {
+                const result = await callEdge('getStaffList');
+                const data = result.data || result;
+                if (data && Array.isArray(data)) {
                     staffList = data.map(s => ({
                         name: s.name,
                         staffType: s.staff_type || 'PT',
@@ -975,46 +978,29 @@
             const name = document.getElementById('editStaffName').value;
             const staffType = document.getElementById('editStaffType').value;
             try {
-                // ── 1. 主寫入：Supabase ──
+                // ── 主寫入：Edge Function ──
                 const staff = staffList.find(s => s.name === name);
                 if (!staff || !staff.id) { showToast('❌ 找不到員工'); return; }
-                const { error } = await sb.from('staff').update({ staff_type: staffType }).eq('id', staff.id);
-                if (error) { showToast('❌ 更新失敗：' + error.message); return; }
+                await callEdge('updateStaffType', { id: staff.id, staff_type: staffType });
 
                 clearCache('staff_cache');
                 staff.staffType = staffType;
                 showToast('✅ 員工類型已更新');
                 closeModal('editStaffModal');
                 renderStaffList();
-
-                // ── 2. GAS callback ──
-                if (API_URL) {
-                    try {
-                        await fetch(API_URL + '?action=updateStaffType&data=' + encodeURIComponent(JSON.stringify({ name, staffType, source: 'supabase_frontend' })));
-                    } catch(gasErr) { console.warn('⚠️ GAS 回寫失敗', gasErr); }
-                }
             } catch (e) { showToast('❌ 更新失敗：' + e.message); }
         }
 
         async function archiveStaff(name) {
             if (!confirm(`確定要封存「${name}」嗎？封存後不會出現在排班列表中。`)) return;
             try {
-                // ── 1. 主寫入：Supabase（設 status='封存'，不刪除資料）──
+                // ── 主寫入：Edge Function（設 status='封存'，不刪除資料）──
                 const staff = staffList.find(s => s.name === name);
                 if (!staff || !staff.id) { showToast('❌ 找不到員工'); return; }
-                const { error } = await sb.from('staff').update({ status: '封存' }).eq('id', staff.id);
-                if (error) { showToast('❌ 封存失敗：' + error.message); return; }
+                await callEdge('archiveStaff', { id: staff.id });
 
                 clearCache('staff_cache');
                 showToast('✅ 員工已封存');
-
-                // ── 2. GAS callback ──
-                if (API_URL) {
-                    try {
-                        await fetch(API_URL + '?action=archiveStaff&data=' + encodeURIComponent(JSON.stringify({ name, status: '封存', source: 'supabase_frontend' })));
-                    } catch(gasErr) { console.warn('⚠️ GAS 回寫失敗', gasErr); }
-                }
-
                 await loadStaff();
             } catch (e) { showToast('❌ 封存失敗：' + e.message); }
         }
@@ -1030,12 +1016,13 @@
                 updateLegend();
                 return;
             }
-            
-            // 從 Supabase 載入
+
+            // 從 Edge Function 載入
             try {
-                const { data, error } = await sb.from('shifts').select('*');
-                if (!error && data) {
-                    // Supabase 用 is_leave，前端用 isLeave，統一轉換
+                const result = await callEdge('getShifts');
+                const data = result.data || result;
+                if (data && Array.isArray(data)) {
+                    // Edge Function 用 is_leave，前端用 isLeave，統一轉換
                     shifts = data.map(s => ({
                         ...s,
                         isLeave: s.is_leave || false,
@@ -1059,15 +1046,15 @@
                 updateTypeSelects();
                 return;
             }
-            
-            // 從 Supabase 載入（從 staff 表取不重複的 staff_type）
+
+            // 從 Edge Function 載入（從 staff 表取不重複的 staff_type）
             try {
-                const { data, error } = await sb.from('staff').select('staff_type');
-                if (!error && data) {
-                    const types = [...new Set(data.map(s => s.staff_type).filter(Boolean))];
+                const result = await callEdge('getStaffTypes');
+                const data = (result.data || result);
+                if (data && Array.isArray(data)) {
+                    staffTypes = data;
                     // 確保預設值存在
-                    ['正職', 'PT', '半薪正職'].forEach(t => { if (!types.includes(t)) types.push(t); });
-                    staffTypes = types;
+                    ['正職', 'PT', '半薪正職'].forEach(t => { if (!staffTypes.includes(t)) staffTypes.push(t); });
                     setCachedData('staffTypes_cache', staffTypes); // 快取
                     updateTypeSelects();
                 }
@@ -1122,13 +1109,6 @@
             renderTypeList();
             updateTypeSelects();
             showToast('✅ 類型已新增');
-
-            // GAS callback（讓 Sheet 也知道新類型）
-            if (API_URL) {
-                try {
-                    await fetch(API_URL + '?action=addStaffType&data=' + encodeURIComponent(JSON.stringify({ type: typeName })));
-                } catch(gasErr) { console.warn('⚠️ GAS 回寫失敗', gasErr); }
-            }
         }
 
         async function deleteType(typeName) {
@@ -1139,13 +1119,6 @@
             renderTypeList();
             updateTypeSelects();
             showToast('✅ 類型已刪除');
-
-            // GAS callback
-            if (API_URL) {
-                try {
-                    await fetch(API_URL + '?action=deleteStaffType&type=' + encodeURIComponent(typeName));
-                } catch(gasErr) { console.warn('⚠️ GAS 回寫失敗', gasErr); }
-            }
         }
 
         function renderShiftList() {
@@ -1278,7 +1251,7 @@
         async function saveShifts() {
             try {
                 showToast('⏳ 儲存中...');
-                // ── 1. 主寫入：Supabase（upsert 全部班別）──
+                // ── 主寫入：Edge Function（upsert 全部班別）──
                 const sbShifts = shifts.map(s => ({
                     id: s.id,
                     name: s.name,
@@ -1288,20 +1261,10 @@
                     leave_type: s.leaveType || null,
                     disabled: s.disabled || false
                 }));
-                const { error } = await sb.from('shifts').upsert(sbShifts, { onConflict: 'id' });
-                if (error) { showToast('❌ 儲存失敗：' + error.message); return; }
+                await callEdge('saveShifts', { shifts: sbShifts });
 
                 clearCache('shifts_cache');
                 showToast('✅ 班別已儲存');
-
-                // ── 2. GAS callback（回寫 Google Sheet，失敗不影響）──
-                if (API_URL) {
-                    try {
-                        const payload = encodeURIComponent(JSON.stringify(shifts));
-                        await fetch(API_URL + '?action=saveShifts&data=' + payload);
-                    } catch(gasErr) { console.warn('⚠️ GAS 班別回寫失敗', gasErr); }
-                }
-
                 await loadShifts();
             } catch (e) { showToast('❌ 儲存失敗：' + e.message); }
         }
@@ -1946,7 +1909,7 @@ function parseTimeToMinutes(timeStr) {
  * ⚡ 計算累計差異（重寫版：使用 loadScheduleFromAPI + 與 updateStats 完全一致的計算邏輯）
  */
 async function calculateAccumulatedDiff(currentStats) {
-    if (!sb) return;
+    if (!EDGE_FUNCTION_URL) return;
 
     const currentMonthStr = getCurrentMonthStr();
 
@@ -2491,16 +2454,14 @@ async function calculateAccumulatedDiff(currentStats) {
         }
 
         async function exportSchedule() {
-            if (!API_URL) { showToast('請先設定 API'); return; }
-            
             const d = {};
             const lastDay = new Date(currentYear, currentMonth + 1, 0);
-            
+
             for (let day = 1; day <= lastDay.getDate(); day++) {
                 const date = new Date(currentYear, currentMonth, day);
                 const dateStr = formatDate(date);
                 const daySchedule = schedule[dateStr] || [];
-                
+
                 if (daySchedule.length > 0) {
                     d[day] = daySchedule.map(item => {
                         // 🆕 計算加班時數（只計算已審核的）
@@ -2508,7 +2469,7 @@ async function calculateAccumulatedDiff(currentStats) {
                         if (item.overtimeStart && item.overtimeEnd && item.overtimeStatus === '已審核') {
                             overtimeHours = calculateOvertimeHours(item.overtimeStart, item.overtimeEnd);
                         }
-                        
+
                         return [
                             item.staffName,
                             item.shiftId,
@@ -2520,15 +2481,15 @@ async function calculateAccumulatedDiff(currentStats) {
                     });
                 }
             }
-            
-            if (Object.keys(d).length === 0) { 
-                showToast('沒有排班資料'); 
-                return; 
+
+            if (Object.keys(d).length === 0) {
+                showToast('沒有排班資料');
+                return;
             }
-            
+
             const monthStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
             const h = holidays.filter(x => x.date.startsWith(monthStr)).map(x => parseInt(x.date.split('-')[2]));
-            
+
             const staffStats = {};
             staffList.forEach(s => { staffStats[s.name] = 0; });
             for (const dateStr in schedule) {
@@ -2541,29 +2502,22 @@ async function calculateAccumulatedDiff(currentStats) {
             const sortedStaffNames = staffList
                 .sort((a, b) => (staffStats[b.name] || 0) - (staffStats[a.name] || 0))
                 .map(s => s.name);
-            
+
             showToast('📤 匯出中...');
-            
+
             try {
-                const payload = {
-                    action: 'exportSchedule',
-                    y: currentYear,
-                    m: currentMonth + 1,
-                    d: d,
-                    h: h,
-                    s: sortedStaffNames
-                };
-                
-                const res = await fetch(API_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'text/plain' },
-                    body: JSON.stringify(payload)
+                // ── Edge Function 匯出 ──
+                const result = await callEdge('exportSchedule', {
+                    year: currentYear,
+                    month: currentMonth + 1,
+                    schedules: d,
+                    holidays: h,
+                    staffNames: sortedStaffNames
                 });
-                const data = await res.json();
-                showToast(data.success ? '✅ ' + data.message : '❌ 匯出失敗：' + (data.error || ''));
-            } catch (e) { 
+                showToast(result.success ? '✅ ' + result.message : '❌ 匯出失敗：' + (result.error || ''));
+            } catch (e) {
                 console.error('匯出失敗', e);
-                showToast('❌ 匯出失敗：' + e.message); 
+                showToast('❌ 匯出失敗：' + e.message);
             }
         }
 
@@ -2624,13 +2578,10 @@ async function calculateAccumulatedDiff(currentStats) {
             container.innerHTML = '<div class="loading"><div class="spinner"></div>載入中...</div>';
             
             try {
-                const { data, error } = await sb
-                    .from('overtime_records')
-                    .select('*')
-                    .eq('status', '待審核')
-                    .order('overtime_date', { ascending: false });
+                const result = await callEdge('getPendingOvertimes');
+                const data = result.data || result;
 
-                if (!error) {
+                if (data) {
                     pendingOvertimes = (data || []).map(r => ({
                         id: r.id,
                         rowIndex: r.id,
@@ -2749,33 +2700,11 @@ async function calculateAccumulatedDiff(currentStats) {
             if (!record) { showToast('❌ 找不到記錄'); return; }
 
             try {
-                // ── 1. 主寫入：更新 Supabase overtime_records 狀態 ──
-                const { error } = await sb.from('overtime_records').update({ status: '已審核' }).eq('id', rowIndex);
-                if (error) { showToast('❌ 審核失敗：' + error.message); return; }
-
-                // ── 2. 同步更新 staff_schedules 的加班欄位 ──
-                try {
-                    const staffInfo = staffList.find(s => s.name === record.staffName);
-                    if (staffInfo && staffInfo.id && record.date) {
-                        await sb.from('staff_schedules').update({
-                            overtime_start: record.startTime || null,
-                            overtime_end: record.endTime || null,
-                            overtime_status: '已審核',
-                            overtime_hours: record.hours || null
-                        }).eq('staff_id', staffInfo.id).eq('schedule_date', record.date);
-                    }
-                } catch(schedErr) { console.warn('⚠️ staff_schedules 更新失敗', schedErr); }
+                // ── 主寫入：Edge Function（更新 overtime_records 和 staff_schedules） ──
+                await callEdge('approveOvertime', { id: rowIndex });
 
                 showToast('✅ 已審核通過');
                 loadPendingOvertime();
-
-                // ── 3. GAS callback ──
-                if (API_URL) {
-                    try {
-                        await fetch(API_URL + '?action=reviewOvertime&data=' + encodeURIComponent(JSON.stringify({ rowIndex, approved: true, source: 'supabase_frontend' })));
-                    } catch(gasErr) { console.warn('⚠️ GAS 回寫失敗', gasErr); }
-                }
-
                 await loadScheduleData(getCurrentMonthStr());
                 generateCalendar();
             } catch (e) { showToast('❌ 審核失敗：' + e.message); }
@@ -2785,19 +2714,11 @@ async function calculateAccumulatedDiff(currentStats) {
             if (!confirm('確定拒絕此加班申請？')) return;
 
             try {
-                // ── 1. 主寫入：Supabase ──
-                const { error } = await sb.from('overtime_records').update({ status: '已拒絕' }).eq('id', rowIndex);
-                if (error) { showToast('❌ 操作失敗：' + error.message); return; }
+                // ── 主寫入：Edge Function ──
+                await callEdge('rejectOvertime', { id: rowIndex });
 
                 showToast('✅ 已拒絕');
                 loadPendingOvertime();
-
-                // ── 2. GAS callback ──
-                if (API_URL) {
-                    try {
-                        await fetch(API_URL + '?action=reviewOvertime&data=' + encodeURIComponent(JSON.stringify({ rowIndex, approved: false, source: 'supabase_frontend' })));
-                    } catch(gasErr) { console.warn('⚠️ GAS 回寫失敗', gasErr); }
-                }
             } catch (e) { showToast('❌ 操作失敗：' + e.message); }
         }
         
@@ -2809,13 +2730,10 @@ async function calculateAccumulatedDiff(currentStats) {
             container.innerHTML = '<div class="loading"><div class="spinner"></div>載入中...</div>';
             
             try {
-                const { data, error } = await sb
-                    .from('leave_requests')
-                    .select('*')
-                    .eq('status', '待審核')
-                    .order('leave_date', { ascending: false });
+                const result = await callEdge('getPendingLeaves');
+                const data = result.data || result;
 
-                if (!error) {
+                if (data) {
                     pendingLeaves = (data || []).map(r => ({
                         id: r.id,
                         rowIndex: r.id,
@@ -2905,31 +2823,11 @@ async function calculateAccumulatedDiff(currentStats) {
             if (!record) { showToast('❌ 找不到記錄'); return; }
 
             try {
-                // ── 1. 主寫入：更新 Supabase leave_requests 狀態 ──
-                const { error } = await sb.from('leave_requests').update({ status: '已審核' }).eq('id', rowIndex);
-                if (error) { showToast('❌ 審核失敗：' + error.message); return; }
-
-                // ── 2. 同步更新 staff_schedules 的請假欄位 ──
-                try {
-                    const staffInfo = staffList.find(s => s.name === record.staffName);
-                    if (staffInfo && staffInfo.id && record.date) {
-                        await sb.from('staff_schedules').update({
-                            leave_type: record.leaveType || null,
-                            leave_hours: record.hours || null
-                        }).eq('staff_id', staffInfo.id).eq('schedule_date', record.date);
-                    }
-                } catch(schedErr) { console.warn('⚠️ staff_schedules 請假更新失敗', schedErr); }
+                // ── 主寫入：Edge Function（更新 leave_requests 和 staff_schedules） ──
+                await callEdge('approveLeave', { id: rowIndex });
 
                 showToast('✅ 已審核通過');
                 loadPendingLeave();
-
-                // ── 3. GAS callback ──
-                if (API_URL) {
-                    try {
-                        await fetch(API_URL + '?action=reviewLeave&data=' + encodeURIComponent(JSON.stringify({ rowIndex, approved: true, source: 'supabase_frontend' })));
-                    } catch(gasErr) { console.warn('⚠️ GAS 回寫失敗', gasErr); }
-                }
-
                 await loadScheduleData(getCurrentMonthStr());
                 generateCalendar();
             } catch (e) { showToast('❌ 審核失敗：' + e.message); }
@@ -2939,19 +2837,11 @@ async function calculateAccumulatedDiff(currentStats) {
             if (!confirm('確定拒絕此請假申請？')) return;
 
             try {
-                // ── 1. 主寫入：Supabase ──
-                const { error } = await sb.from('leave_requests').update({ status: '已拒絕' }).eq('id', rowIndex);
-                if (error) { showToast('❌ 操作失敗：' + error.message); return; }
+                // ── 主寫入：Edge Function ──
+                await callEdge('rejectLeave', { id: rowIndex });
 
                 showToast('✅ 已拒絕');
                 loadPendingLeave();
-
-                // ── 2. GAS callback ──
-                if (API_URL) {
-                    try {
-                        await fetch(API_URL + '?action=reviewLeave&data=' + encodeURIComponent(JSON.stringify({ rowIndex, approved: false, source: 'supabase_frontend' })));
-                    } catch(gasErr) { console.warn('⚠️ GAS 回寫失敗', gasErr); }
-                }
             } catch (e) { showToast('❌ 操作失敗：' + e.message); }
         }
         
@@ -3008,18 +2898,8 @@ async function calculateAccumulatedDiff(currentStats) {
                     });
                 }
 
-                // 先刪除該月舊資料
-                const monthStart = monthStr + '-01';
-                const monthEnd = monthStr + '-31';
-                await sb.from('staff_schedules').delete().gte('schedule_date', monthStart).lte('schedule_date', monthEnd);
-
-                // 分批 upsert（每批 50 筆）
-                for (let i = 0; i < sbRecords.length; i += 50) {
-                    const batch = sbRecords.slice(i, i + 50);
-                    const { error } = await sb.from('staff_schedules').upsert(batch, { onConflict: 'staff_id,schedule_date' });
-                    if (error) { console.error('Supabase 排班寫入錯誤:', error); }
-                }
-                console.log('✅ Supabase 排班寫入完成：' + sbRecords.length + ' 筆');
+                // ── 主寫入：Edge Function（刪除舊資料並 upsert 新排班） ──
+                await callEdge('importSchedules', { month: monthStr, schedules: sbRecords });
 
                 // 標記該月份已儲存 + 同步 localStorage
                 if (!savedMonths.includes(monthStr)) {
@@ -3028,35 +2908,11 @@ async function calculateAccumulatedDiff(currentStats) {
                 }
                 saveLocalSchedule();
                 delete accumulatedDiffCache[monthStr];
+                console.log('✅ Supabase 排班寫入完成：' + sbRecords.length + ' 筆');
                 console.log('🗑️ 已清除 ' + monthStr + ' 的累計差異快取');
 
-                // ── 2. GAS callback（回寫 Sheet + MySQL + 日曆，失敗不影響主資料）──
-                let gasMsg = '';
-                if (API_URL) {
-                    try {
-                        const gasPayload = { action: 'saveSchedules', month: monthStr, schedules: schedule, source: 'supabase_frontend' };
-                        const res = await fetch(API_URL, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                            body: JSON.stringify(gasPayload)
-                        });
-                        const gasData = await res.json();
-                        if (gasData.success) {
-                            if (gasData.webhookSent) gasMsg += '，已同步至 MySQL';
-                            if (gasData.calendarSynced) gasMsg += '，已同步至日曆';
-                            if (gasData.webhookError) gasMsg += '（' + gasData.webhookError + '）';
-                            if (gasData.calendarError) gasMsg += '（日曆：' + gasData.calendarError + '）';
-                        } else {
-                            gasMsg += '（GAS 回寫失敗：' + (gasData.error || '') + '）';
-                        }
-                    } catch(gasErr) {
-                        console.warn('⚠️ GAS 回寫失敗', gasErr);
-                        gasMsg += '（GAS 回寫失敗）';
-                    }
-                }
-
                 loadingToast.classList.remove('show');
-                showToast('✅ 儲存完成' + gasMsg);
+                showToast('✅ 儲存完成');
             } catch (e) {
                 loadingToast.classList.remove('show');
                 console.error('儲存錯誤:', e);
