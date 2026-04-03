@@ -855,26 +855,18 @@
             // 用 LINE uid 查員工，取得 staffId
             if (uidParam) {
                 try {
-                    const { data, error } = await sb
-                        .from('staff')
-                        .select('id, name')
-                        .eq('line_id_edu', uidParam)
-                        .single();
-                    if (!error && data) {
-                        staffId = data.id;
-                        if (!staffName) staffName = data.name;
+                    const result = await callEdge('identifyStaff', { lineUid: uidParam });
+                    if (result && result.id) {
+                        staffId = result.id;
+                        if (!staffName) staffName = result.name;
                     }
                 } catch(e) { console.error('查詢員工失敗', e); }
             }
             // 向下相容：用 name 查 id
             if (!staffId && staffName) {
                 try {
-                    const { data, error } = await sb
-                        .from('staff')
-                        .select('id')
-                        .eq('name', staffName)
-                        .single();
-                    if (!error && data) staffId = data.id;
+                    const result = await callEdge('identifyStaff', { name: staffName });
+                    if (result && result.id) staffId = result.id;
                 } catch(e) { console.error('查詢員工失敗', e); }
             }
 
@@ -925,16 +917,11 @@
             
             try {
                 const year = new Date().getFullYear();
-                const { data, error } = await sb
-                    .from('leave_requests')
-                    .select('*')
-                    .eq('staff_name', staffName)
-                    .gte('leave_date', year + '-01-01')
-                    .lte('leave_date', year + '-12-31')
-                    .order('leave_date', { ascending: false });
+                const result = await callEdge('getMyLeaves', { staffName, year });
+                const data = result.data || result;
 
-                if (!error) {
-                    myLeaveRecords = (data || []).map(r => ({
+                if (data) {
+                    myLeaveRecords = (Array.isArray(data) ? data : []).map(r => ({
                         date: r.leave_date,
                         requestDate: r.request_date,
                         shiftName: r.shift_name || '',
@@ -1017,25 +1004,24 @@
                 shiftContainer.style.display = 'none';
                 return;
             }
-            
-            try {
-                const { data, error } = await sb
-                    .from('staff_schedules')
-                    .select('shift_type, start_time, end_time')
-                    .eq('staff_id', staffId)
-                    .eq('schedule_date', dateStr)
-                    .limit(1);
 
-                if (!error && data && data.length > 0) {
-                    const r = data[0];
-                    const shiftDef = shifts.find(s => s.id === r.shift_type);
-                    let displayName = shiftDef ? shiftDef.name : r.shift_type;
-                    if (!shiftDef && r.shift_type && r.shift_type.startsWith('custom_')) {
-                        displayName = '自訂';
+            try {
+                const result = await callEdge('checkScheduleConflict', { staffId, date: dateStr });
+                const data = result.data || result;
+
+                if (data && (Array.isArray(data) ? data.length > 0 : data.shift_type)) {
+                    const dataArr = Array.isArray(data) ? data : [data];
+                    if (dataArr.length > 0) {
+                        const r = data[0];
+                        const shiftDef = shifts.find(s => s.id === r.shift_type);
+                        let displayName = shiftDef ? shiftDef.name : r.shift_type;
+                        if (!shiftDef && r.shift_type && r.shift_type.startsWith('custom_')) {
+                            displayName = '自訂';
+                        }
+                        shiftNameSpan.textContent = displayName + (r.start_time ? ` (${r.start_time}-${r.end_time})` : '');
+                        shiftContainer.style.display = 'block';
+                        return;
                     }
-                    shiftNameSpan.textContent = displayName + (r.start_time ? ` (${r.start_time}-${r.end_time})` : '');
-                    shiftContainer.style.display = 'block';
-                    return;
                 }
 
                 shiftNameSpan.textContent = '無排班';
@@ -1171,14 +1157,10 @@
                 const [_y, _m] = monthStr.split('-').map(Number);
 const endDate = `${_m === 12 ? _y + 1 : _y}-${String(_m === 12 ? 1 : _m + 1).padStart(2, '0')}-01`;
 
-                const { data, error } = await sb
-                    .from('staff_schedules')
-                    .select('*')
-                    .eq('staff_id', staffId)
-                    .gte('schedule_date', startDate)
-                    .lt('schedule_date', endDate);
+                const result = await callEdge('getMySchedules', { staffId, startDate, endDate });
+                const data = result.data || result;
 
-                if (!error && data) {
+                if (data) {
                     lastMonthSchedules = {};
                     const trimSec = t => t ? t.replace(/:\d{2}$/, '') : t;
                     data.forEach(r => {
@@ -1220,14 +1202,10 @@ const endDate = `${_m === 12 ? _y + 1 : _y}-${String(_m === 12 ? 1 : _m + 1).pad
                 const [_y, _m] = monthStr.split('-').map(Number);
 const endDate = `${_m === 12 ? _y + 1 : _y}-${String(_m === 12 ? 1 : _m + 1).padStart(2, '0')}-01`;
 
-                const { data, error } = await sb
-                    .from('staff_schedules')
-                    .select('*')
-                    .eq('staff_id', staffId)
-                    .gte('schedule_date', startDate)
-                    .lt('schedule_date', endDate);
+                const result = await callEdge('getMySchedules', { staffId, startDate, endDate });
+                const data = result.data || result;
 
-                if (!error && data) {
+                if (data) {
                     currentMonthSchedules = {};
                     // 去秒數輔助函式
                     const trimSec = t => t ? t.replace(/:\d{2}$/, '') : t;
@@ -2076,15 +2054,12 @@ data.forEach(r => {
         
         async function loadSavedAvailability() {
             if (!staffName) return false;
-            
-            try {
-                const { data: myData, error } = await sb
-                    .from('staff')
-                    .select('availability')
-                    .eq('name', staffName)
-                    .single();
 
-                if (error || !myData || !myData.availability) return false;
+            try {
+                const result = await callEdge('getAvailability', { staffName });
+
+                if (!result || !result.availability) return false;
+                const myData = result;
                 
                 const lines = myData.availability.split('\n').filter(line => line.trim());
                 if (lines.length === 0) return false;
@@ -2238,12 +2213,9 @@ data.forEach(r => {
            try {
                 const totalDays = availabilityArr.length;
 
-                // ── 1. 主寫入：Supabase ──
-                const { error } = await sb
-                    .from('staff')
-                    .update({ availability: availabilityStr, updated_at: new Date().toISOString() })
-                    .eq('name', staffName);
-                if (error) { showToast('❌ 送出失敗：' + error.message); return; }
+                // ── 1. 主寫入：callEdge ──
+                const result = await callEdge('saveAvailability', { staffName, availability: availabilityStr });
+                if (result.error) { showToast('❌ 送出失敗：' + result.error.message); return; }
 
                 showToast('✅ 已送出！');
             } catch (e) {
@@ -2414,14 +2386,10 @@ async function updateMyAvailabilityStats() {
                 const [_y, _m] = monthStr.split('-').map(Number);
 const endDate = `${_m === 12 ? _y + 1 : _y}-${String(_m === 12 ? 1 : _m + 1).padStart(2, '0')}-01`;
 
-                const { data: schedArr, error } = await sb
-                    .from('staff_schedules')
-                    .select('*')
-                    .eq('staff_id', staffId)
-                    .gte('schedule_date', startDate)
-                    .lt('schedule_date', endDate);
+                const result = await callEdge('getMySchedules', { staffId, startDate, endDate });
+                const schedArr = result.data || result;
 
-                if (error || !schedArr || schedArr.length === 0) {
+                if (!schedArr || schedArr.length === 0) {
                     container.innerHTML = '<div style="color:#999;font-size:13px;">本月尚無排班</div>';
                     return;
                 }
@@ -2691,12 +2659,8 @@ const endDate = `${_m === 12 ? _y + 1 : _y}-${String(_m === 12 ? 1 : _m + 1).pad
        async function getMyStaffInfo() {
             if (!staffName) return null;
             try {
-                const { data, error } = await sb
-                    .from('staff')
-                    .select('*')
-                    .eq('name', staffName)
-                    .single();
-                if (!error && data) return data;
+                const result = await callEdge('identifyStaff', { name: staffName });
+                if (result) return result;
             } catch (e) {
                 console.error('取得員工資訊失敗:', e);
             }
