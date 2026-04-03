@@ -469,7 +469,7 @@
             font-size: 15px;
         }
     </style>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- supabase-js CDN 已移除，改用 Edge Function -->
 </head>
 <body>
     <div class="loading-screen" id="loadingScreen">
@@ -810,12 +810,18 @@
                 console.warn('快取清除失敗:', e);
             }
         }
-        
+
    // ============ 設定區 ============
-        const API_URL = 'https://script.google.com/macros/s/AKfycbzfpaCZKS3yPT9_1k5QpY8V01xPJA8ERPjNM59e0ZSLEdHpUJzKYmcCoUhPOqrMr6KOdg/exec';
-        const SUPABASE_URL = 'https://mnjilhpztnowaplggvkk.supabase.co';
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1uamlsaHB6dG5vd2FwbGdndmtrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU3MDA0ODYsImV4cCI6MjA4MTI3NjQ4Nn0.X3e9DF3iT2KUR9ma3_Ins01vG607R155v0xia8hO_Qg';
-        const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        const EDGE_FUNCTION_URL = 'https://mnjilhpztnowaplggvkk.supabase.co/functions/v1/schedule-api';
+        async function callEdge(action, params = {}) {
+            const res = await fetch(EDGE_FUNCTION_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action, ...params })
+            });
+            if (!res.ok) throw new Error('Edge Function error: ' + res.status);
+            return res.json();
+        }
 
         async function retryFetch(url, options, maxRetries = 2) {
             for (let i = 0; i <= maxRetries; i++) {
@@ -915,7 +921,7 @@
         let myLeaveQuota = null;
         
         async function loadMyLeaveRecords() {
-            if (!API_URL || !staffName) return;
+            if (!staffName) return;
             
             try {
                 const year = new Date().getFullYear();
@@ -1006,8 +1012,8 @@
         async function checkLeaveDate(dateStr) {
             const shiftContainer = document.getElementById('leaveOriginalShift');
             const shiftNameSpan = document.getElementById('leaveShiftName');
-            
-            if (!API_URL || !staffName) {
+
+            if (!staffName) {
                 shiftContainer.style.display = 'none';
                 return;
             }
@@ -1071,17 +1077,9 @@
                     reason: reason,
                     status: '待審核'
                 };
-                const { error } = await sb.from('leave_requests').insert(insertData);
-                if (error) { showToast('❌ 送出失敗：' + error.message); return; }
-
-                // ── 2. GAS callback（失敗不影響主流程）──
                 try {
-                    const payload = {
-                        action: 'submitLeave', staff: staffName, source: 'supabase_frontend',
-                        submissions: [{ date: dateStr, shiftName: shiftName !== '無排班' ? shiftName : '', leaveType, hours, reason }]
-                    };
-                    await retryFetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(payload) });
-                } catch(sheetErr) { console.warn('⚠️ GAS 回寫失敗:', sheetErr); }
+                    await callEdge('submitLeaveRequest', insertData);
+                } catch (error) { showToast('❌ 送出失敗：' + error.message); return; }
 
                 showToast('✅ 請假申請已送出！');
                 closeLeaveModal();
@@ -1356,14 +1354,9 @@ data.forEach(r => {
                     note: note,
                     status: '待審核'
                 };
-                const { error } = await sb.from('overtime_records').insert(insertData);
-                if (error) { showToast('❌ 送出失敗：' + error.message); return; }
-
-                // ── 2. GAS callback ──
                 try {
-                    payload.source = 'supabase_frontend';
-                    await retryFetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(payload) });
-                } catch(sheetErr) { console.warn('⚠️ GAS 回寫失敗:', sheetErr); }
+                    await callEdge('submitOvertimeRequest', insertData);
+                } catch (error) { showToast('❌ 送出失敗：' + error.message); return; }
 
                 showToast('✅ 加班申請已送出！');
                 closeOvertimeFillModal();
@@ -1479,14 +1472,9 @@ data.forEach(r => {
                     note: s.noOvertime ? '無加班' : '',
                     status: '待審核'
                 }));
-                const { error } = await sb.from('overtime_records').insert(sbInserts);
-                if (error) { showToast('❌ 送出失敗：' + error.message); return; }
-
-                // ── 2. GAS callback ──
                 try {
-                    payload.source = 'supabase_frontend';
-                    await retryFetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(payload) });
-                } catch(sheetErr) { console.warn('⚠️ GAS 回寫失敗:', sheetErr); }
+                    await callEdge('submitOvertimeRequest', { records: sbInserts });
+                } catch (error) { showToast('❌ 送出失敗：' + error.message); return; }
 
                 showToast('✅ 加班時間已送出，等待審核');
                 pendingOvertimes = [];
@@ -1503,27 +1491,19 @@ data.forEach(r => {
             // 🆕 先檢查快取
             const cacheKey = 'shifts_cache';
             const cached = getCache(cacheKey);
-            
+
             if (cached) {
                 console.log('✅ 使用快取的班別資料');
                 shifts = cached;
                 loadLeaveOptions(shifts);
                 return shifts;
             }
-            
+
             // 快取未命中，從 API 載入
-            if (!API_URL) {
-                shifts = [
-                    { id: 'shift1', name: '午班', time: '12:00-18:00', color: '#9fcccc' },
-                    { id: 'shift2', name: '晚班', time: '18:00-22:00', color: '#a78bfa' }
-                ];
-                loadLeaveOptions([]);
-                return shifts;
-            }
             
             try {
-               const { data, error } = await sb.from('shifts').select('*');
-                if (!error && data) {
+               const data = await callEdge('getShifts');
+                if (data) {
                     // Supabase 用 is_leave，前端用 isLeave，統一轉換
                     shifts = data.map(s => ({
                         ...s,
@@ -2095,7 +2075,7 @@ data.forEach(r => {
         function loadLocalData() { const saved = localStorage.getItem(`available_${staffName}`); if (saved) availableDates = JSON.parse(saved); }
         
         async function loadSavedAvailability() {
-            if (!API_URL || !staffName) return false;
+            if (!staffName) return false;
             
             try {
                 const { data: myData, error } = await sb
@@ -2230,7 +2210,6 @@ data.forEach(r => {
 
         async function confirmSubmit() {
             closeConfirmModal();
-            if (!API_URL) { showToast('❌ API 未設定'); return; }
             if (!staffName) { showToast('❌ 請從正確的連結進入'); return; }
 
             // 送出所有月份的可上班日期（不限當前月）
@@ -2265,12 +2244,6 @@ data.forEach(r => {
                     .update({ availability: availabilityStr, updated_at: new Date().toISOString() })
                     .eq('name', staffName);
                 if (error) { showToast('❌ 送出失敗：' + error.message); return; }
-
-                // ── 2. GAS callback ──
-                try {
-                    const payload = { action: 'updateAvailability', name: staffName, availability: availabilityStr, totalDays, source: 'supabase_frontend' };
-                    await retryFetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(payload) });
-                } catch(sheetErr) { console.warn('⚠️ GAS 回寫失敗:', sheetErr); }
 
                 showToast('✅ 已送出！');
             } catch (e) {
@@ -2434,12 +2407,7 @@ async function updateMyAvailabilityStats() {
          */
         async function updateActualScheduleStats() {
             const container = document.getElementById('actualScheduleStatsContent');
-            
-            if (!API_URL) {
-                container.innerHTML = '<div style="color:#999;font-size:13px;">API 未設定</div>';
-                return;
-            }
-            
+
             try {
                 const monthStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
                 const startDate = monthStr + '-01';
