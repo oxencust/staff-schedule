@@ -1482,8 +1482,9 @@ data.forEach(r => {
             // 快取未命中，從 API 載入
             
             try {
-               const data = await callEdge('getShifts');
-                if (data) {
+               const result = await callEdge('getShifts');
+                const data = result.data || result;
+                if (Array.isArray(data)) {
                     // Supabase 用 is_leave，前端用 isLeave，統一轉換
                     shifts = data.map(s => ({
                         ...s,
