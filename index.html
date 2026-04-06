@@ -1501,7 +1501,7 @@
                 const daySchedule = schedule[dateStr];
                 daySchedule.forEach(item => {
                     // 跳過無法對應姓名的記錄（已刪除員工或 null）
-                    if (!item.staffName || item.staffName.startsWith('HDB') || item.staffName === 'null') return;
+                    if (!item.staffName || item.staffName.startsWith('HD') || item.staffName === 'null') return;
                     if (!stats[item.staffName]) {
                         const sType = staffTypeMap[item.staffName] || 'PT';
                         stats[item.staffName] = {
@@ -1969,7 +1969,7 @@ async function calculateAccumulatedDiff(currentStats) {
                 const daySchedule = monthSchedule[dateStr];
 
                 daySchedule.forEach(item => {
-                    if (!item.staffName || item.staffName.startsWith('HDB') || item.staffName === 'null') return;
+                    if (!item.staffName || item.staffName.startsWith('HD') || item.staffName === 'null') return;
 
                     // 🆕 去重檢查
                     const dedupeKey = item.staffName + '_' + dateStr;
