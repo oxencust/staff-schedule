@@ -527,7 +527,12 @@
         }
        // ============ 設定區（請在這裡修改）============
         const EDGE_FUNCTION_URL = 'https://mnjilhpztnowaplggvkk.supabase.co/functions/v1/schedule-api';
+        const MY_LINE_UID = urlParams.get('uid') || '';
         async function callEdge(action, params = {}) {
+            // 自動帶 lineUid 供 auth 驗證
+            if (MY_LINE_UID && !params.lineUid) {
+                params.lineUid = MY_LINE_UID;
+            }
             const res = await fetch(EDGE_FUNCTION_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
