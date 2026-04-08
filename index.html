@@ -2903,8 +2903,42 @@ async function calculateAccumulatedDiff(currentStats) {
                     });
                 }
 
-                // ── 主寫入：Edge Function（刪除舊資料並 upsert 新排班） ──
+                // ── 1. 主寫入：Edge Function（刪除舊資料並 upsert 新排班） ──
                 await callEdge('importSchedules', { month: monthStr, schedules: sbRecords });
+                console.log('✅ Supabase 排班寫入完成：' + sbRecords.length + ' 筆');
+
+                // ── 2. 同步 Google Calendar（透過 GAS） ──
+                const GAS_SCHEDULE_URL = 'https://script.google.com/macros/s/AKfycbzfpaCZKS3yPT9_1k5QpY8V01xPJA8ERPjNM59e0ZSLEdHpUJzKYmcCoUhPOqrMr6KOdg/exec';
+                try {
+                    // 組出 GAS 需要的格式：{ "2026-04-08": [{ staffName, shiftId, ... }], ... }
+                    const gasSchedules = {};
+                    for (const dateStr in schedule) {
+                        if (!dateStr.startsWith(monthStr)) continue;
+                        gasSchedules[dateStr] = schedule[dateStr];
+                    }
+                    const gasRes = await fetch(GAS_SCHEDULE_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            action: 'saveSchedules',
+                            month: monthStr,
+                            schedules: gasSchedules
+                        })
+                    });
+                    const gasText = await gasRes.text();
+                    try {
+                        const gasJson = JSON.parse(gasText);
+                        if (gasJson.calendarSynced) {
+                            console.log('✅ Google Calendar 同步成功');
+                        } else {
+                            console.warn('⚠️ Google Calendar 同步失敗:', gasJson.calendarError || '未知錯誤');
+                        }
+                    } catch (_) {
+                        console.warn('⚠️ GAS 回應非 JSON:', gasText);
+                    }
+                } catch (gasErr) {
+                    console.warn('⚠️ GAS 日曆同步失敗（不影響主儲存）:', gasErr.message);
+                }
 
                 // 標記該月份已儲存 + 同步 localStorage
                 if (!savedMonths.includes(monthStr)) {
@@ -2913,7 +2947,6 @@ async function calculateAccumulatedDiff(currentStats) {
                 }
                 saveLocalSchedule();
                 delete accumulatedDiffCache[monthStr];
-                console.log('✅ Supabase 排班寫入完成：' + sbRecords.length + ' 筆');
                 console.log('🗑️ 已清除 ' + monthStr + ' 的累計差異快取');
 
                 loadingToast.classList.remove('show');
