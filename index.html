@@ -2918,12 +2918,12 @@ async function calculateAccumulatedDiff(currentStats) {
                     }
                     const gasRes = await fetch(GAS_SCHEDULE_URL, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             action: 'saveSchedules',
                             month: monthStr,
                             schedules: gasSchedules
-                        })
+                        }),
+                        redirect: 'follow'
                     });
                     const gasText = await gasRes.text();
                     try {
