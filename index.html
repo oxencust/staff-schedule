@@ -2908,7 +2908,7 @@ async function calculateAccumulatedDiff(currentStats) {
                 console.log('✅ Supabase 排班寫入完成：' + sbRecords.length + ' 筆');
 
                 // ── 2. 同步 Google Calendar（透過 GAS） ──
-                const GAS_SCHEDULE_URL = 'https://script.google.com/macros/s/AKfycbzfpaCZKS3yPT9_1k5QpY8V01xPJA8ERPjNM59e0ZSLEdHpUJzKYmcCoUhPOqrMr6KOdg/exec';
+                const GAS_SCHEDULE_URL = 'https://script.google.com/macros/s/AKfycbzec-R1GSPiuMuQ92zzkfy6vx8thGrNdud1qvOi06apqYp4wcmsTt-n79tIMiwO98Qamg/exec';
                 try {
                     // 組出 GAS 需要的格式：{ "2026-04-08": [{ staffName, shiftId, ... }], ... }
                     const gasSchedules = {};
