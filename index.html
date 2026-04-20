@@ -657,10 +657,19 @@
                     } else if (availShifts.includes(':')) {
                         // 自訂時間：建立臨時自訂班別
                         const customShiftId = 'custom_' + date + '_' + staff.name;
+                        // 從 availShifts 解析時間範圍（例：'14:00-20:00' 或 '午班, 14:00-20:00'）
+                        const timeMatch = availShifts.match(/(\d{1,2}:\d{2})\s*[-~]\s*(\d{1,2}:\d{2})/);
+                        const startTime = timeMatch ? timeMatch[1] : '';
+                        const endTime   = timeMatch ? timeMatch[2] : '';
+                        const shiftTime = (startTime && endTime) ? (startTime + '-' + endTime) : '';
                         schedule[date].push({
                             staffName: staff.name,
                             shiftId: customShiftId,
-                            shiftName: '自訂 ' + availShifts,
+                            shiftName: '自訂' + (shiftTime ? ' ' + shiftTime : ' ' + availShifts),
+                            shiftColor: getCustomShiftColor(startTime, endTime),
+                            shiftTime: shiftTime,
+                            startTime: startTime,
+                            endTime: endTime,
                             overtime: 0,
                             overtimeStart: '',
                             overtimeEnd: '',
@@ -2903,41 +2912,22 @@ async function calculateAccumulatedDiff(currentStats) {
                     });
                 }
 
-                // ── 1. 主寫入：Edge Function（刪除舊資料並 upsert 新排班） ──
-                await callEdge('importSchedules', { month: monthStr, schedules: sbRecords });
+                // ── 寫入 Supabase + 同步 Google Calendar（透過 Edge Function → GAS） ──
+                const gasSchedules = {};
+                for (const dateStr in schedule) {
+                    if (!dateStr.startsWith(monthStr)) continue;
+                    gasSchedules[dateStr] = schedule[dateStr];
+                }
+                const importResult = await callEdge('importSchedules', {
+                    month: monthStr,
+                    schedules: sbRecords,
+                    gasSchedules: gasSchedules
+                });
                 console.log('✅ Supabase 排班寫入完成：' + sbRecords.length + ' 筆');
-
-                // ── 2. 同步 Google Calendar（透過 GAS） ──
-                const GAS_SCHEDULE_URL = 'https://script.google.com/macros/s/AKfycbzec-R1GSPiuMuQ92zzkfy6vx8thGrNdud1qvOi06apqYp4wcmsTt-n79tIMiwO98Qamg/exec';
-                try {
-                    // 組出 GAS 需要的格式：{ "2026-04-08": [{ staffName, shiftId, ... }], ... }
-                    const gasSchedules = {};
-                    for (const dateStr in schedule) {
-                        if (!dateStr.startsWith(monthStr)) continue;
-                        gasSchedules[dateStr] = schedule[dateStr];
-                    }
-                    const gasRes = await fetch(GAS_SCHEDULE_URL, {
-                        method: 'POST',
-                        body: JSON.stringify({
-                            action: 'saveSchedules',
-                            month: monthStr,
-                            schedules: gasSchedules
-                        }),
-                        redirect: 'follow'
-                    });
-                    const gasText = await gasRes.text();
-                    try {
-                        const gasJson = JSON.parse(gasText);
-                        if (gasJson.calendarSynced) {
-                            console.log('✅ Google Calendar 同步成功');
-                        } else {
-                            console.warn('⚠️ Google Calendar 同步失敗:', gasJson.calendarError || '未知錯誤');
-                        }
-                    } catch (_) {
-                        console.warn('⚠️ GAS 回應非 JSON:', gasText);
-                    }
-                } catch (gasErr) {
-                    console.warn('⚠️ GAS 日曆同步失敗（不影響主儲存）:', gasErr.message);
+                if (importResult?.calendarSynced) {
+                    console.log('✅ Google Calendar 同步成功');
+                } else if (importResult?.calendarError) {
+                    console.warn('⚠️ Google Calendar 同步失敗:', importResult.calendarError);
                 }
 
                 // 標記該月份已儲存 + 同步 localStorage
