@@ -179,6 +179,65 @@
         .spinner { width: 30px; height: 30px; border: 3px solid #e0e0e0; border-top-color: var(--green); border-radius: 50%; animation: spin 1s linear infinite; margin-right: 10px; }
         @keyframes spin { to { transform: rotate(360deg); } }
 
+        /* ========== 考勤統計 ========== */
+        .att-subtabs { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; border-bottom: 2px solid #e0e0e0; padding-bottom: 8px; }
+        .att-subtab-btn { padding: 8px 16px; border: 2px solid #e0e0e0; background: white; border-radius: 8px 8px 0 0; cursor: pointer; font-size: 13px; font-weight: 600; color: var(--gray); font-family: inherit; }
+        .att-subtab-btn:hover { background: #f8f9fa; }
+        .att-subtab-btn.active { background: var(--green-light); color: var(--green-dark); border-color: var(--green); }
+        .att-subtab-content { display: none; }
+        .att-subtab-content.active { display: block; }
+
+        .att-toolbar { display: flex; gap: 10px; align-items: center; margin-bottom: 15px; flex-wrap: wrap; padding: 10px; background: #f8f9fa; border-radius: 8px; }
+        .att-toolbar label { font-weight: 600; font-size: 13px; display: flex; align-items: center; gap: 6px; }
+        .att-toolbar input { padding: 6px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; }
+
+        .att-summary-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+        .att-card { background: white; border: 1px solid #e0e0e0; border-radius: 10px; padding: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border-left: 4px solid var(--green); }
+        .att-card.has-late { border-left-color: var(--pink); }
+        .att-card.has-early { border-left-color: var(--yellow); }
+        .att-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .att-card-name { font-weight: 700; font-size: 15px; color: var(--green-dark); }
+        .att-card-toggle { background: none; border: none; color: var(--green); cursor: pointer; font-size: 12px; font-family: inherit; }
+        .att-card-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 12px; }
+        .att-stat { padding: 4px 0; }
+        .att-stat-label { color: #666; }
+        .att-stat-value { font-weight: 700; color: #333; }
+        .att-stat-value.bad { color: #dc2626; }
+        .att-stat-value.warn { color: #d97706; }
+
+        .att-detail-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; display: none; }
+        .att-detail-table.show { display: table; }
+        .att-detail-table th, .att-detail-table td { padding: 6px 8px; text-align: left; border-bottom: 1px solid #f0f0f0; }
+        .att-detail-table th { background: #f8f9fa; color: var(--green-dark); font-weight: 600; font-size: 11px; }
+        .att-detail-table tr.row-late { background: #fff5f5; }
+        .att-detail-table tr.row-early { background: #fffbeb; }
+        .att-detail-table tr.row-forgiven { background: #f0fdf4; }
+
+        .att-late-pill { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+        .att-late-pill.auto-late { background: #fee2e2; color: #dc2626; }
+        .att-late-pill.confirmed { background: #fecaca; color: #991b1b; }
+        .att-late-pill.forgiven { background: #d1fae5; color: #065f46; }
+        .att-late-pill.ontime { background: #e5e7eb; color: #4b5563; }
+
+        .att-action-btns { display: inline-flex; gap: 4px; }
+        .att-mini-btn { padding: 3px 8px; border: 1px solid #ddd; background: white; border-radius: 4px; cursor: pointer; font-size: 11px; font-family: inherit; }
+        .att-mini-btn:hover { background: #f8f9fa; }
+        .att-mini-btn.active-late { background: #fee2e2; border-color: #fca5a5; color: #991b1b; }
+        .att-mini-btn.active-forgive { background: #d1fae5; border-color: #6ee7b7; color: #065f46; }
+
+        .att-year-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+        .att-year-table th, .att-year-table td { border: 1px solid #e0e0e0; padding: 4px 6px; text-align: center; }
+        .att-year-table thead th { background: var(--green-light); color: var(--green-dark); font-weight: 700; position: sticky; top: 0; }
+        .att-year-table tbody td:first-child, .att-year-table tbody th:first-child { background: #f8f9fa; font-weight: 700; text-align: left; position: sticky; left: 0; min-width: 80px; }
+        .att-year-cell { display: flex; flex-direction: column; gap: 2px; font-size: 10px; }
+        .att-year-cell .y-row { white-space: nowrap; }
+        .att-year-cell .y-row.bad { color: #dc2626; font-weight: 600; }
+        .att-year-cell .y-row.warn { color: #d97706; }
+
+        .unbound-row { display: grid; grid-template-columns: 1fr 1fr 100px 1fr 200px 100px; gap: 10px; align-items: center; padding: 10px; border-bottom: 1px solid #f0f0f0; font-size: 13px; }
+        .unbound-row:nth-child(even) { background: #fafafa; }
+        .unbound-row select { padding: 4px 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; }
+
         /* ========== 手機版優化 ========== */
         @media (max-width: 768px) {
             .navbar { padding: 12px 15px; }
@@ -389,6 +448,7 @@
         <div class="tab" onclick="switchTab('calendar')">📅 排班日曆</div>
         <div class="tab" onclick="switchTab('overtime')">⏰ 加班審核</div>
         <div class="tab" onclick="switchTab('leave')">📝 請假審核</div>
+        <div class="tab" onclick="switchTab('attendance')">📊 考勤統計</div>
     </div>
 
     <div class="tab-content active" id="tab-staff">
@@ -466,7 +526,79 @@
                     <div class="loading"><div class="spinner"></div>載入中...</div>
                 </div>
             </div>
-            
+
+        </div>
+    </div>
+
+    <!-- ═════════════ 考勤統計分頁 ═════════════ -->
+    <div class="tab-content" id="tab-attendance">
+        <div class="container">
+            <div class="settings-panel">
+                <h3>📊 考勤統計</h3>
+                <p style="font-size: 13px; color: #666; margin-bottom: 15px;">整合排班與打卡資料，逐筆檢視遲到/早退並可由行政決定是否寬限</p>
+
+                <!-- 子分頁列 -->
+                <div class="att-subtabs">
+                    <button class="att-subtab-btn active" onclick="switchAttSubTab('month', this)">📅 月度統計</button>
+                    <button class="att-subtab-btn" onclick="switchAttSubTab('year', this)">📆 年度視圖</button>
+                    <button class="att-subtab-btn" onclick="switchAttSubTab('unbound', this)">🔗 未綁定打卡</button>
+                    <button class="att-subtab-btn" onclick="switchAttSubTab('unsched', this)">⚠️ 未排班打卡</button>
+                </div>
+
+                <!-- ─── 月度統計 ─── -->
+                <div class="att-subtab-content active" id="att-sub-month">
+                    <div class="att-toolbar">
+                        <label>年月：
+                            <input type="month" id="attMonthInput">
+                        </label>
+                        <button class="btn btn-secondary" onclick="loadAttendanceMonth()">🔄 重新整理</button>
+                        <button class="btn btn-export" onclick="exportAttendanceMonthExcel()">📊 匯出考勤 Excel</button>
+                        <button class="btn btn-export" style="background: var(--purple);" onclick="exportCombinedMonthExcel()">📋 整合月報 Excel</button>
+                    </div>
+                    <div class="att-summary-cards" id="attMonthCards">
+                        <div class="loading"><div class="spinner"></div>載入中...</div>
+                    </div>
+                </div>
+
+                <!-- ─── 年度視圖 ─── -->
+                <div class="att-subtab-content" id="att-sub-year">
+                    <div class="att-toolbar">
+                        <label>年度：
+                            <input type="number" id="attYearInput" min="2024" max="2099" style="width: 100px;">
+                        </label>
+                        <button class="btn btn-secondary" onclick="loadAttendanceYear()">🔄 重新整理</button>
+                        <button class="btn btn-export" onclick="exportAttendanceYearExcel()">📊 匯出年度 Excel</button>
+                    </div>
+                    <div id="attYearContainer">
+                        <p style="color:#999; padding:20px; text-align:center;">請按「重新整理」載入資料</p>
+                    </div>
+                </div>
+
+                <!-- ─── 未綁定打卡 ─── -->
+                <div class="att-subtab-content" id="att-sub-unbound">
+                    <div class="att-toolbar">
+                        <button class="btn btn-secondary" onclick="loadUnboundPunches()">🔄 重新整理</button>
+                        <span style="font-size:12px;color:#666;">未綁定 = 打卡時系統未識別到員工，可手動綁定到對的人</span>
+                    </div>
+                    <div id="unboundContainer">
+                        <p style="color:#999; padding:20px; text-align:center;">請按「重新整理」載入資料</p>
+                    </div>
+                </div>
+
+                <!-- ─── 未排班打卡 ─── -->
+                <div class="att-subtab-content" id="att-sub-unsched">
+                    <div class="att-toolbar">
+                        <label>年月：
+                            <input type="month" id="attUnschedMonth">
+                        </label>
+                        <button class="btn btn-secondary" onclick="loadUnscheduledPunches()">🔄 重新整理</button>
+                        <span style="font-size:12px;color:#666;">該日無任何排班但有打卡 → 可送加班審核走既有流程</span>
+                    </div>
+                    <div id="unschedContainer">
+                        <p style="color:#999; padding:20px; text-align:center;">請按「重新整理」載入資料</p>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -863,6 +995,7 @@
             if (tabId === 'calendar') { generateCalendar(); updateLegend(); }
             if (tabId === 'overtime') { loadPendingOvertime(); }
             if (tabId === 'leave') { loadPendingLeave(); }
+            if (tabId === 'attendance') { initAttendanceTab(); }
         }
 
         // ✨ 快取輔助函數
@@ -2956,7 +3089,7 @@ async function calculateAccumulatedDiff(currentStats) {
         function toggleMonthlyDetails(staffName, year) {
             const elem = document.getElementById(`monthly-${staffName}-${year}`);
             const icon = document.getElementById(`toggle-icon-${staffName}-${year}`);
-            
+
             if (elem && icon) {
                 if (elem.style.display === 'none') {
                     elem.style.display = 'block';
@@ -2966,6 +3099,613 @@ async function calculateAccumulatedDiff(currentStats) {
                     icon.textContent = '▼';
                 }
             }
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        //   考勤統計分頁
+        //   後端 API：getAttendanceReport / getUnboundPunches /
+        //            bindPunchToStaff / setAttendanceReview /
+        //            submitUnscheduledOvertime / exportAttendanceYear
+        // ═══════════════════════════════════════════════════════════════
+
+        let _attendanceState = {
+            month: null,        // 'YYYY-MM'
+            data: null,         // getAttendanceReport response
+            year: null,         // YYYY
+            yearData: null,
+            unbound: [],
+            staffList: [],
+        };
+
+        function initAttendanceTab() {
+            // 預設帶入當月／當年
+            const now = new Date();
+            const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+            const monthInput = document.getElementById('attMonthInput');
+            const unschedInput = document.getElementById('attUnschedMonth');
+            const yearInput = document.getElementById('attYearInput');
+            if (monthInput && !monthInput.value) monthInput.value = ym;
+            if (unschedInput && !unschedInput.value) unschedInput.value = ym;
+            if (yearInput && !yearInput.value) yearInput.value = now.getFullYear();
+            // 預設載入月度
+            if (!_attendanceState.data) loadAttendanceMonth();
+        }
+
+        function switchAttSubTab(sub, btn) {
+            document.querySelectorAll('.att-subtab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.att-subtab-content').forEach(c => c.classList.remove('active'));
+            btn.classList.add('active');
+            document.getElementById('att-sub-' + sub).classList.add('active');
+            if (sub === 'unbound' && _attendanceState.unbound.length === 0) loadUnboundPunches();
+        }
+
+        // ─── 月度統計 ───
+        async function loadAttendanceMonth() {
+            const ym = document.getElementById('attMonthInput').value;
+            if (!ym) { showToast('請選擇年月'); return; }
+            const [y, m] = ym.split('-').map(Number);
+            const startDate = `${ym}-01`;
+            const endDate = `${ym}-${String(new Date(y, m, 0).getDate()).padStart(2, '0')}`;
+
+            const container = document.getElementById('attMonthCards');
+            container.innerHTML = '<div class="loading"><div class="spinner"></div>載入中...</div>';
+            try {
+                const res = await callEdge('getAttendanceReport', { startDate, endDate });
+                if (!res.success) throw new Error(res.error || '載入失敗');
+                _attendanceState.month = ym;
+                _attendanceState.data = res;
+                _attendanceState.staffList = res.staff || [];
+                renderAttendanceMonthCards();
+            } catch (e) {
+                container.innerHTML = `<p style="color:#dc2626;padding:20px;">載入失敗：${e.message}</p>`;
+            }
+        }
+
+        function renderAttendanceMonthCards() {
+            const container = document.getElementById('attMonthCards');
+            const data = _attendanceState.data;
+            if (!data || !data.summary || data.summary.length === 0) {
+                container.innerHTML = '<p style="color:#999;padding:20px;text-align:center;">本月無排班資料</p>';
+                return;
+            }
+            const html = data.summary.map(s => {
+                const lateCls = (s.total_late_count||0) > 0 ? 'has-late' : '';
+                const earlyCls = (s.total_early_leave_count||0) > 0 ? 'has-early' : '';
+                const cardCls = ['att-card', lateCls, earlyCls].filter(Boolean).join(' ');
+                return `
+                    <div class="${cardCls}" id="att-card-${s.staff_id}">
+                        <div class="att-card-header">
+                            <div class="att-card-name">${escapeHtml(s.staff_name)}</div>
+                            <button class="att-card-toggle" onclick="toggleStaffDetail('${s.staff_id}')">明細 ▼</button>
+                        </div>
+                        <div class="att-card-stats">
+                            <div class="att-stat"><span class="att-stat-label">出勤天數：</span><span class="att-stat-value">${s.total_attended||0}/${s.total_scheduled||0}</span></div>
+                            <div class="att-stat"><span class="att-stat-label">缺勤：</span><span class="att-stat-value ${(s.total_absent||0)>0?'bad':''}">${s.total_absent||0} 天</span></div>
+                            <div class="att-stat"><span class="att-stat-label">遲到：</span><span class="att-stat-value ${(s.total_late_count||0)>0?'bad':''}">${s.total_late_count||0} 次 / ${s.total_late_minutes||0} 分</span></div>
+                            <div class="att-stat"><span class="att-stat-label">早退：</span><span class="att-stat-value ${(s.total_early_leave_count||0)>0?'warn':''}">${s.total_early_leave_count||0} 次 / ${s.total_early_leave_minutes||0} 分</span></div>
+                            <div class="att-stat"><span class="att-stat-label">加班：</span><span class="att-stat-value">${Number(s.total_overtime_hours||0).toFixed(1)} h</span></div>
+                            <div class="att-stat"><span class="att-stat-label">請假：</span><span class="att-stat-value">${Number(s.total_leave_hours||0).toFixed(1)} h</span></div>
+                        </div>
+                        <div id="att-detail-${s.staff_id}"></div>
+                    </div>
+                `;
+            }).join('');
+            container.innerHTML = html;
+        }
+
+        function toggleStaffDetail(staffId) {
+            const wrap = document.getElementById(`att-detail-${staffId}`);
+            if (!wrap) return;
+            // 已展開 → 收起
+            const existing = wrap.querySelector('.att-detail-table');
+            if (existing) {
+                if (existing.classList.contains('show')) {
+                    existing.classList.remove('show');
+                } else {
+                    existing.classList.add('show');
+                }
+                return;
+            }
+            // 第一次展開 → 渲染
+            wrap.innerHTML = renderStaffDetail(staffId);
+            const tbl = wrap.querySelector('.att-detail-table');
+            if (tbl) tbl.classList.add('show');
+        }
+
+        function renderStaffDetail(staffId) {
+            const data = _attendanceState.data;
+            const days = (data.days || []).filter(d => String(d.staff_id) === String(staffId));
+            if (days.length === 0) return '<p style="font-size:12px;color:#999;padding:8px;">無排班</p>';
+            const rows = days.map(d => {
+                const lateStatus = d.late_status || 'auto';
+                const lateMin = d.late_minutes || 0;
+                const earlyMin = d.early_leave_minutes || 0;
+                const earlyStatus = d.early_leave_status || 'auto';
+
+                let latePill;
+                if (lateStatus === 'forgiven') {
+                    latePill = `<span class="att-late-pill forgiven">寬限</span>`;
+                } else if (lateStatus === 'late_confirmed') {
+                    latePill = `<span class="att-late-pill confirmed">確認 ${lateMin} 分</span>`;
+                } else if (lateMin > 0) {
+                    latePill = `<span class="att-late-pill auto-late">自動 ${lateMin} 分</span>`;
+                } else {
+                    latePill = `<span class="att-late-pill ontime">準時</span>`;
+                }
+
+                let earlyPill;
+                if (earlyStatus === 'forgiven') {
+                    earlyPill = `<span class="att-late-pill forgiven">寬限</span>`;
+                } else if (earlyStatus === 'confirmed') {
+                    earlyPill = `<span class="att-late-pill confirmed">確認 ${earlyMin} 分</span>`;
+                } else if (earlyMin > 0) {
+                    earlyPill = `<span class="att-late-pill auto-late">自動 ${earlyMin} 分</span>`;
+                } else {
+                    earlyPill = `<span class="att-late-pill ontime">準時</span>`;
+                }
+
+                const rowCls = lateStatus === 'forgiven' || earlyStatus === 'forgiven' ? 'row-forgiven'
+                            : lateMin > 0 ? 'row-late'
+                            : earlyMin > 0 ? 'row-early' : '';
+
+                const lateBtns = lateMin > 0 ? `
+                    <div class="att-action-btns">
+                        <button class="att-mini-btn ${lateStatus==='late_confirmed'?'active-late':''}" onclick="setReviewLate(${d.schedule_id},'late_confirmed')">算遲到</button>
+                        <button class="att-mini-btn ${lateStatus==='forgiven'?'active-forgive':''}" onclick="setReviewLate(${d.schedule_id},'forgiven')">寬限</button>
+                        <button class="att-mini-btn ${lateStatus==='auto'?'active-late':''}" onclick="setReviewLate(${d.schedule_id},'auto')">回自動</button>
+                    </div>
+                ` : '—';
+
+                const earlyBtns = earlyMin > 0 ? `
+                    <div class="att-action-btns">
+                        <button class="att-mini-btn ${earlyStatus==='confirmed'?'active-late':''}" onclick="setReviewEarly(${d.schedule_id},'confirmed')">算早退</button>
+                        <button class="att-mini-btn ${earlyStatus==='forgiven'?'active-forgive':''}" onclick="setReviewEarly(${d.schedule_id},'forgiven')">寬限</button>
+                        <button class="att-mini-btn ${earlyStatus==='auto'?'active-late':''}" onclick="setReviewEarly(${d.schedule_id},'auto')">回自動</button>
+                    </div>
+                ` : '—';
+
+                const inDisp = d.actual_in ? formatTimeShort(d.actual_in) : '—';
+                const outDisp = d.actual_out ? formatTimeShort(d.actual_out) : '—';
+                return `
+                    <tr class="${rowCls}">
+                        <td>${d.schedule_date}</td>
+                        <td>${escapeHtml(d.shift_type||'')}</td>
+                        <td>${d.start_time||''} ~ ${d.end_time||''}</td>
+                        <td>${inDisp}</td>
+                        <td>${outDisp}</td>
+                        <td>${latePill}</td>
+                        <td>${earlyPill}</td>
+                        <td>${lateBtns}</td>
+                        <td>${earlyBtns}</td>
+                    </tr>
+                `;
+            }).join('');
+            return `
+                <table class="att-detail-table">
+                    <thead>
+                        <tr><th>日期</th><th>班別</th><th>排定時段</th><th>上班打卡</th><th>下班打卡</th><th>遲到</th><th>早退</th><th>遲到動作</th><th>早退動作</th></tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            `;
+        }
+
+        async function setReviewLate(scheduleId, status) {
+            try {
+                const note = status === 'forgiven' ? (prompt('寬限原因（可留空）') || '') : '';
+                const res = await callEdge('setAttendanceReview', {
+                    scheduleId, lateStatus: status, note
+                });
+                if (!res.success) throw new Error(res.error || '操作失敗');
+                showToast('已更新');
+                await loadAttendanceMonth();
+            } catch (e) { showToast('失敗：' + e.message); }
+        }
+
+        async function setReviewEarly(scheduleId, status) {
+            try {
+                const note = status === 'forgiven' ? (prompt('寬限原因（可留空）') || '') : '';
+                const res = await callEdge('setAttendanceReview', {
+                    scheduleId, earlyLeaveStatus: status, note
+                });
+                if (!res.success) throw new Error(res.error || '操作失敗');
+                showToast('已更新');
+                await loadAttendanceMonth();
+            } catch (e) { showToast('失敗：' + e.message); }
+        }
+
+        // ─── 年度視圖 ───
+        async function loadAttendanceYear() {
+            const y = parseInt(document.getElementById('attYearInput').value);
+            if (!y) { showToast('請輸入年度'); return; }
+            const c = document.getElementById('attYearContainer');
+            c.innerHTML = '<div class="loading"><div class="spinner"></div>計算中（可能要 5~10 秒）...</div>';
+            try {
+                const res = await callEdge('exportAttendanceYear', { year: y });
+                if (!res.success) throw new Error(res.error || '載入失敗');
+                _attendanceState.year = y;
+                _attendanceState.yearData = res;
+                renderAttendanceYearTable();
+            } catch (e) {
+                c.innerHTML = `<p style="color:#dc2626;padding:20px;">載入失敗：${e.message}</p>`;
+            }
+        }
+
+        function renderAttendanceYearTable() {
+            const c = document.getElementById('attYearContainer');
+            const yd = _attendanceState.yearData;
+            const rows = yd && yd.data ? yd.data : [];
+            if (rows.length === 0) {
+                c.innerHTML = '<p style="color:#999;padding:20px;text-align:center;">無資料</p>';
+                return;
+            }
+            const monthsLabels = Array.from({ length: 12 }, (_, i) => i + 1);
+            const head = `<tr><th>員工</th>${monthsLabels.map(m => `<th>${m}月</th>`).join('')}<th>合計</th></tr>`;
+            const body = rows.map(r => {
+                let totPresent=0, totLate=0, totLateMin=0, totOTHr=0;
+                const monthsArr = Array.isArray(r.months) ? r.months : [];
+                const cells = monthsLabels.map((m, i) => {
+                    const cell = monthsArr[i] || {};
+                    const present = cell.attended || 0;
+                    const lateCount = cell.late_count || 0;
+                    const lateMin = cell.late_minutes || 0;
+                    const otHr = Number(cell.overtime_hours || 0);
+                    totPresent += present; totLate += lateCount; totLateMin += lateMin; totOTHr += otHr;
+                    return `<td><div class="att-year-cell">
+                        <span class="y-row">出勤 ${present}</span>
+                        <span class="y-row ${lateCount>0?'bad':''}">遲到 ${lateCount}/${lateMin}m</span>
+                        <span class="y-row ${otHr>0?'warn':''}">加班 ${otHr.toFixed(1)}h</span>
+                    </div></td>`;
+                }).join('');
+                const tot = `<td><div class="att-year-cell">
+                    <span class="y-row">${totPresent}</span>
+                    <span class="y-row ${totLate>0?'bad':''}">${totLate}/${totLateMin}m</span>
+                    <span class="y-row ${totOTHr>0?'warn':''}">${totOTHr.toFixed(1)}h</span>
+                </div></td>`;
+                return `<tr><th>${escapeHtml(r.staff_name)}</th>${cells}${tot}</tr>`;
+            }).join('');
+            c.innerHTML = `<div style="overflow:auto;max-height:70vh;border:1px solid #e0e0e0;border-radius:8px;">
+                <table class="att-year-table"><thead>${head}</thead><tbody>${body}</tbody></table>
+            </div>`;
+        }
+
+        // ─── 未綁定打卡 ───
+        async function loadUnboundPunches() {
+            const c = document.getElementById('unboundContainer');
+            c.innerHTML = '<div class="loading"><div class="spinner"></div>載入中...</div>';
+            try {
+                const res = await callEdge('getUnboundPunches', {});
+                if (!res.success) throw new Error(res.error || '載入失敗');
+                _attendanceState.unbound = res.data || [];
+                // 員工清單若沒有則一併載入
+                if (_attendanceState.staffList.length === 0) {
+                    const list = await callEdge('getStaffList', {});
+                    if (list.success) _attendanceState.staffList = list.staff || list.data || [];
+                }
+                renderUnbound();
+            } catch (e) {
+                c.innerHTML = `<p style="color:#dc2626;padding:20px;">載入失敗：${e.message}</p>`;
+            }
+        }
+
+        function renderUnbound() {
+            const c = document.getElementById('unboundContainer');
+            const list = _attendanceState.unbound;
+            if (!list || list.length === 0) {
+                c.innerHTML = '<p style="color:#16a34a;padding:20px;text-align:center;">✨ 沒有未綁定的打卡</p>';
+                return;
+            }
+            const opts = (_attendanceState.staffList || [])
+                .map(s => `<option value="${s.id}">${escapeHtml(s.name)}</option>`)
+                .join('');
+            const header = `<div class="unbound-row" style="grid-template-columns:160px 90px 120px 1fr 220px 100px;font-weight:700;background:#f8f9fa;">
+                <div>打卡時間</div><div>類型</div><div>暫存姓名</div><div>備註</div><div>綁定到</div><div>動作</div>
+            </div>`;
+            const rows = list.map(p => `
+                <div class="unbound-row" style="grid-template-columns:160px 90px 120px 1fr 220px 100px;" id="unbound-${p.id}">
+                    <div>${formatDateTimeShort(p.punch_at)}</div>
+                    <div>${escapeHtml(punchTypeLabel(p.punch_type))}</div>
+                    <div>${escapeHtml(p.pending_name||'—')}</div>
+                    <div style="font-size:11px;color:#666;word-break:break-all;">${escapeHtml(p.note||'—')}</div>
+                    <div><select id="bind-sel-${p.id}"><option value="">— 選員工 —</option>${opts}</select></div>
+                    <div><button class="btn btn-primary" style="padding:6px 10px;font-size:12px;" onclick="bindOnePunch(${p.id})">綁定</button></div>
+                </div>
+            `).join('');
+            c.innerHTML = header + rows;
+        }
+
+        async function bindOnePunch(punchId) {
+            const sel = document.getElementById(`bind-sel-${punchId}`);
+            if (!sel || !sel.value) { showToast('請先選員工'); return; }
+            const staffId = sel.value;
+            try {
+                const res = await callEdge('bindPunchToStaff', {
+                    punchIds: [punchId],
+                    staffId
+                });
+                if (!res.success) throw new Error(res.error || '綁定失敗');
+                showToast('已綁定');
+                document.getElementById(`unbound-${punchId}`)?.remove();
+                _attendanceState.unbound = _attendanceState.unbound.filter(p => p.id !== punchId);
+            } catch (e) { showToast('失敗：' + e.message); }
+        }
+
+        // ─── 未排班打卡 ───
+        async function loadUnscheduledPunches() {
+            const ym = document.getElementById('attUnschedMonth').value;
+            if (!ym) { showToast('請選擇年月'); return; }
+            const [y, m] = ym.split('-').map(Number);
+            const startDate = `${ym}-01`;
+            const endDate = `${ym}-${String(new Date(y, m, 0).getDate()).padStart(2, '0')}`;
+            const c = document.getElementById('unschedContainer');
+            c.innerHTML = '<div class="loading"><div class="spinner"></div>載入中...</div>';
+            try {
+                const res = await callEdge('getAttendanceReport', { startDate, endDate });
+                if (!res.success) throw new Error(res.error || '載入失敗');
+                const list = res.unscheduled || [];
+                if (list.length === 0) {
+                    c.innerHTML = '<p style="color:#16a34a;padding:20px;text-align:center;">✨ 本月所有打卡都有對應排班</p>';
+                    return;
+                }
+                const rows = list.map(u => `
+                    <div class="unbound-row" style="grid-template-columns: 120px 1fr 140px 140px 80px 140px;" id="unsched-${u.staff_id}-${u.punch_date}">
+                        <div>${u.punch_date}</div>
+                        <div><strong>${escapeHtml(u.staff_name)}</strong></div>
+                        <div>最早進：${u.earliest_in ? formatTimeShort(u.earliest_in) : '—'}</div>
+                        <div>最晚出：${u.latest_out ? formatTimeShort(u.latest_out) : '—'}</div>
+                        <div>${u.punch_count} 筆</div>
+                        <div><button class="btn btn-primary" style="padding:6px 10px;font-size:12px;" onclick="submitUnscheduledOT('${u.staff_id}','${u.punch_date}','${u.earliest_in||''}','${u.latest_out||''}')">送加班審核</button></div>
+                    </div>
+                `).join('');
+                const header = `<div class="unbound-row" style="grid-template-columns:120px 1fr 140px 140px 80px 140px;font-weight:700;background:#f8f9fa;">
+                    <div>日期</div><div>員工</div><div>打卡上班</div><div>打卡下班</div><div>筆數</div><div>動作</div>
+                </div>`;
+                c.innerHTML = header + rows;
+            } catch (e) {
+                c.innerHTML = `<p style="color:#dc2626;padding:20px;">載入失敗：${e.message}</p>`;
+            }
+        }
+
+        async function submitUnscheduledOT(staffId, date, inIso, outIso) {
+            if (!inIso || !outIso) { showToast('該日缺上下班打卡其一，無法送加班單'); return; }
+            const reason = prompt('加班原因（必填）');
+            if (!reason || !reason.trim()) { showToast('已取消'); return; }
+            // ISO → 台北時區 HH:MM 字串
+            const startTime = formatTimeShort(inIso);
+            const endTime = formatTimeShort(outIso);
+            try {
+                const res = await callEdge('submitUnscheduledOvertime', {
+                    staffId, date, startTime, endTime,
+                    note: reason.trim()
+                });
+                if (!res.success) throw new Error(res.error || '送出失敗');
+                showToast('已送出，請至加班審核分頁批准');
+                document.getElementById(`unsched-${staffId}-${date}`)?.remove();
+            } catch (e) { showToast('失敗：' + e.message); }
+        }
+
+        // ─── 工具：HTML escape ───
+        function escapeHtml(s) {
+            return String(s == null ? '' : s)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
+
+        // ─── 工具：ISO timestamp → 台北時區 HH:MM ───
+        function formatTimeShort(iso) {
+            if (!iso) return '';
+            try {
+                const d = new Date(iso);
+                if (isNaN(d.getTime())) return String(iso);
+                const fmt = new Intl.DateTimeFormat('en-GB', {
+                    timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', hour12: false
+                });
+                return fmt.format(d);
+            } catch (e) { return String(iso); }
+        }
+
+        // ─── 工具：ISO timestamp → 台北時區 MM/DD HH:MM ───
+        function formatDateTimeShort(iso) {
+            if (!iso) return '';
+            try {
+                const d = new Date(iso);
+                if (isNaN(d.getTime())) return String(iso);
+                const fmt = new Intl.DateTimeFormat('zh-TW', {
+                    timeZone: 'Asia/Taipei',
+                    month: '2-digit', day: '2-digit',
+                    hour: '2-digit', minute: '2-digit', hour12: false
+                });
+                return fmt.format(d);
+            } catch (e) { return String(iso); }
+        }
+
+        // ─── 工具：punch_type 中文化 ───
+        function punchTypeLabel(t) {
+            return ({
+                'in': '上班',
+                'out': '下班',
+                'overtime_in': '加班上班',
+                'overtime_out': '加班下班',
+                'extra': '補打卡'
+            })[t] || t || '—';
+        }
+
+        // ─── 工具：toast（沿用既有 showToast，若不存在則 alert） ───
+        if (typeof window.showToast !== 'function') {
+            window.showToast = function (msg) {
+                if (typeof toast === 'function') return toast(msg);
+                console.log(msg); alert(msg);
+            };
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        //   SheetJS 動態載入 + 三個 Excel 匯出
+        // ═══════════════════════════════════════════════════════════════
+        async function ensureSheetJS() {
+            if (window.XLSX) return window.XLSX;
+            await new Promise((resolve, reject) => {
+                const s = document.createElement('script');
+                s.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+                s.onload = resolve;
+                s.onerror = () => reject(new Error('SheetJS 載入失敗'));
+                document.head.appendChild(s);
+            });
+            return window.XLSX;
+        }
+
+        // (1) 月度考勤 Excel
+        async function exportAttendanceMonthExcel() {
+            if (!_attendanceState.data) { showToast('請先載入月度資料'); return; }
+            try {
+                const XLSX = await ensureSheetJS();
+                const data = _attendanceState.data;
+                const ym = _attendanceState.month;
+
+                // Sheet1: 摘要
+                const summaryAoA = [
+                    ['姓名','排班天數','出勤天數','缺勤天數','遲到次數','遲到分鐘','早退次數','早退分鐘','加班(h)','請假(h)']
+                ];
+                (data.summary || []).forEach(s => summaryAoA.push([
+                    s.staff_name,
+                    s.total_scheduled||0,
+                    s.total_attended||0,
+                    s.total_absent||0,
+                    s.total_late_count||0,
+                    s.total_late_minutes||0,
+                    s.total_early_leave_count||0,
+                    s.total_early_leave_minutes||0,
+                    +Number(s.total_overtime_hours||0).toFixed(2),
+                    +Number(s.total_leave_hours||0).toFixed(2)
+                ]));
+
+                // Sheet2: 逐日明細
+                const dayAoA = [
+                    ['姓名','日期','班別','排定起','排定迄','打卡上班','打卡下班','遲到分','遲到判定','早退分','早退判定','加班(h)','請假類型','請假(h)','缺勤','備註']
+                ];
+                (data.days || []).forEach(d => dayAoA.push([
+                    d.staff_name, d.schedule_date, d.shift_type||'',
+                    d.start_time||'', d.end_time||'',
+                    d.actual_in ? formatTimeShort(d.actual_in) : '',
+                    d.actual_out ? formatTimeShort(d.actual_out) : '',
+                    d.late_minutes||0, d.late_status||'auto',
+                    d.early_leave_minutes||0, d.early_leave_status||'auto',
+                    Number(d.overtime_hours||0),
+                    d.leave_type||'',
+                    Number(d.leave_hours||0),
+                    d.is_absent ? 'Y' : '',
+                    d.review_note||''
+                ]));
+
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summaryAoA), '月度摘要');
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dayAoA), '逐日明細');
+                XLSX.writeFile(wb, `考勤_${ym}.xlsx`);
+                showToast('已匯出');
+            } catch (e) { showToast('匯出失敗：' + e.message); }
+        }
+
+        // (2) 整合月報 Excel：排班 + 考勤 + 加班 + 請假 + 未排班 統整於一檔
+        async function exportCombinedMonthExcel() {
+            if (!_attendanceState.data) { showToast('請先載入月度資料'); return; }
+            try {
+                const XLSX = await ensureSheetJS();
+                const data = _attendanceState.data;
+                const ym = _attendanceState.month;
+                const wb = XLSX.utils.book_new();
+
+                // 1) 月度摘要
+                const sumAoA = [
+                    ['姓名','排班天數','出勤天數','缺勤天數','遲到次數','遲到分鐘','早退次數','早退分鐘','加班(h)','請假(h)']
+                ];
+                (data.summary || []).forEach(s => sumAoA.push([
+                    s.staff_name,
+                    s.total_scheduled||0, s.total_attended||0, s.total_absent||0,
+                    s.total_late_count||0, s.total_late_minutes||0,
+                    s.total_early_leave_count||0, s.total_early_leave_minutes||0,
+                    +Number(s.total_overtime_hours||0).toFixed(2),
+                    +Number(s.total_leave_hours||0).toFixed(2)
+                ]));
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sumAoA), '月度摘要');
+
+                // 2) 排班 + 考勤 逐日
+                const dayAoA = [
+                    ['姓名','日期','班別','排定起','排定迄','打卡上班','打卡下班','遲到分','遲到判定','早退分','早退判定','加班(h)','請假類型','請假(h)','缺勤','備註']
+                ];
+                (data.days || []).forEach(d => dayAoA.push([
+                    d.staff_name, d.schedule_date, d.shift_type||'',
+                    d.start_time||'', d.end_time||'',
+                    d.actual_in ? formatTimeShort(d.actual_in) : '',
+                    d.actual_out ? formatTimeShort(d.actual_out) : '',
+                    d.late_minutes||0, d.late_status||'auto',
+                    d.early_leave_minutes||0, d.early_leave_status||'auto',
+                    Number(d.overtime_hours||0),
+                    d.leave_type||'',
+                    Number(d.leave_hours||0),
+                    d.is_absent ? 'Y' : '',
+                    d.review_note||''
+                ]));
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dayAoA), '排班與考勤');
+
+                // 3) 未排班打卡
+                const unschedAoA = [['日期','員工','最早進','最晚出','打卡筆數']];
+                (data.unscheduled || []).forEach(u => unschedAoA.push([
+                    u.punch_date, u.staff_name,
+                    u.earliest_in ? formatTimeShort(u.earliest_in) : '',
+                    u.latest_out ? formatTimeShort(u.latest_out) : '',
+                    u.punch_count
+                ]));
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(unschedAoA), '未排班打卡');
+
+                XLSX.writeFile(wb, `整合月報_${ym}.xlsx`);
+                showToast('已匯出整合月報');
+            } catch (e) { showToast('匯出失敗：' + e.message); }
+        }
+
+        // (3) 年度 Excel：單張 sheet，員工 × 12 月，每格三列（出勤/遲到/加班）
+        async function exportAttendanceYearExcel() {
+            if (!_attendanceState.yearData) { showToast('請先載入年度資料'); return; }
+            try {
+                const XLSX = await ensureSheetJS();
+                const yd = _attendanceState.yearData;
+                const rows = yd.data || [];
+                const months = Array.from({ length: 12 }, (_, i) => i + 1);
+
+                // 採「每員工 3 列（出勤/遲到/加班）× 12 月」格式
+                const aoa = [];
+                aoa.push(['姓名','類別', ...months.map(m => `${m}月`), '合計']);
+                rows.forEach(r => {
+                    let totP = 0, totL = 0, totLM = 0, totOTHr = 0;
+                    const presentRow = [r.staff_name, '出勤(天)'];
+                    const lateRow = ['', '遲到(次/分)'];
+                    const otRow = ['', '加班(小時)'];
+                    const monthsArr = Array.isArray(r.months) ? r.months : [];
+                    months.forEach((_, idx) => {
+                        const c = monthsArr[idx] || {};
+                        const p = c.attended || 0;
+                        const lc = c.late_count || 0;
+                        const lm = c.late_minutes || 0;
+                        const oh = Number(c.overtime_hours || 0);
+                        totP += p; totL += lc; totLM += lm; totOTHr += oh;
+                        presentRow.push(p);
+                        lateRow.push(`${lc}/${lm}`);
+                        otRow.push(+oh.toFixed(2));
+                    });
+                    presentRow.push(totP);
+                    lateRow.push(`${totL}/${totLM}`);
+                    otRow.push(+totOTHr.toFixed(2));
+                    aoa.push(presentRow, lateRow, otRow);
+                });
+
+                const ws = XLSX.utils.aoa_to_sheet(aoa);
+                // 凍結首列 + 首兩欄
+                ws['!freeze'] = { xSplit: 2, ySplit: 1 };
+                if (!ws['!views']) ws['!views'] = [{ state: 'frozen', xSplit: 2, ySplit: 1 }];
+
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, `${yd.year}年度考勤`);
+                XLSX.writeFile(wb, `年度考勤_${yd.year}.xlsx`);
+                showToast('已匯出年度');
+            } catch (e) { showToast('匯出失敗：' + e.message); }
         }
     </script>
 </body>
