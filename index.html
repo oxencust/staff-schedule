@@ -191,10 +191,12 @@
         .att-toolbar label { font-weight: 600; font-size: 13px; display: flex; align-items: center; gap: 6px; }
         .att-toolbar input { padding: 6px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; }
 
-        .att-summary-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+        .att-summary-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; align-items: start; }
         .att-card { background: white; border: 1px solid #e0e0e0; border-radius: 10px; padding: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border-left: 4px solid var(--green); }
         .att-card.has-late { border-left-color: var(--pink); }
         .att-card.has-early { border-left-color: var(--yellow); }
+        /* 展開明細時跨整列，避免 9 欄表格被擠扁 */
+        .att-card.expanded { grid-column: 1 / -1; }
         .att-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
         .att-card-name { font-weight: 700; font-size: 15px; color: var(--green-dark); }
         .att-card-toggle { background: none; border: none; color: var(--green); cursor: pointer; font-size: 12px; font-family: inherit; }
@@ -205,9 +207,10 @@
         .att-stat-value.bad { color: #dc2626; }
         .att-stat-value.warn { color: #d97706; }
 
-        .att-detail-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; display: none; }
+        .att-detail-wrap { margin-top: 10px; overflow-x: auto; }
+        .att-detail-table { width: 100%; border-collapse: collapse; font-size: 12px; display: none; }
         .att-detail-table.show { display: table; }
-        .att-detail-table th, .att-detail-table td { padding: 6px 8px; text-align: left; border-bottom: 1px solid #f0f0f0; }
+        .att-detail-table th, .att-detail-table td { padding: 6px 8px; text-align: left; border-bottom: 1px solid #f0f0f0; white-space: nowrap; }
         .att-detail-table th { background: #f8f9fa; color: var(--green-dark); font-weight: 600; font-size: 11px; }
         .att-detail-table tr.row-late { background: #fff5f5; }
         .att-detail-table tr.row-early { background: #fffbeb; }
@@ -3195,14 +3198,17 @@ async function calculateAccumulatedDiff(currentStats) {
 
         function toggleStaffDetail(staffId) {
             const wrap = document.getElementById(`att-detail-${staffId}`);
+            const card = document.getElementById(`att-card-${staffId}`);
             if (!wrap) return;
             // 已展開 → 收起
             const existing = wrap.querySelector('.att-detail-table');
             if (existing) {
                 if (existing.classList.contains('show')) {
                     existing.classList.remove('show');
+                    if (card) card.classList.remove('expanded');
                 } else {
                     existing.classList.add('show');
+                    if (card) card.classList.add('expanded');
                 }
                 return;
             }
@@ -3210,6 +3216,15 @@ async function calculateAccumulatedDiff(currentStats) {
             wrap.innerHTML = renderStaffDetail(staffId);
             const tbl = wrap.querySelector('.att-detail-table');
             if (tbl) tbl.classList.add('show');
+            if (card) card.classList.add('expanded');
+        }
+
+        // 把 HH:MM:SS / HH:MM 都壓成 HH:MM
+        function shortHm(t) {
+            if (!t) return '';
+            const s = String(t);
+            const m = s.match(/^(\d{1,2}):(\d{2})/);
+            return m ? `${m[1].padStart(2,'0')}:${m[2]}` : s;
         }
 
         function renderStaffDetail(staffId) {
@@ -3266,11 +3281,12 @@ async function calculateAccumulatedDiff(currentStats) {
 
                 const inDisp = d.actual_in ? formatTimeShort(d.actual_in) : '—';
                 const outDisp = d.actual_out ? formatTimeShort(d.actual_out) : '—';
+                const periodDisp = `${shortHm(d.start_time)} ~ ${shortHm(d.end_time)}`;
                 return `
                     <tr class="${rowCls}">
                         <td>${d.schedule_date}</td>
                         <td>${escapeHtml(d.shift_type||'')}</td>
-                        <td>${d.start_time||''} ~ ${d.end_time||''}</td>
+                        <td>${periodDisp}</td>
                         <td>${inDisp}</td>
                         <td>${outDisp}</td>
                         <td>${latePill}</td>
@@ -3281,12 +3297,14 @@ async function calculateAccumulatedDiff(currentStats) {
                 `;
             }).join('');
             return `
-                <table class="att-detail-table">
-                    <thead>
-                        <tr><th>日期</th><th>班別</th><th>排定時段</th><th>上班打卡</th><th>下班打卡</th><th>遲到</th><th>早退</th><th>遲到動作</th><th>早退動作</th></tr>
-                    </thead>
-                    <tbody>${rows}</tbody>
-                </table>
+                <div class="att-detail-wrap">
+                    <table class="att-detail-table">
+                        <thead>
+                            <tr><th>日期</th><th>班別</th><th>排定時段</th><th>上班打卡</th><th>下班打卡</th><th>遲到</th><th>早退</th><th>遲到動作</th><th>早退動作</th></tr>
+                        </thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                </div>
             `;
         }
 
