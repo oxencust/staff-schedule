@@ -196,7 +196,7 @@
         .att-card.has-late { border-left-color: var(--pink); }
         .att-card.has-early { border-left-color: var(--yellow); }
         /* 展開明細時跨整列，避免 9 欄表格被擠扁 */
-        .att-card.expanded { grid-column: 1 / -1; }
+        /* 過去用 expanded 把卡片佔滿一整列；現改為 Modal 彈窗呈現，卡片不再展開 */
         .att-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
         .att-card-name { font-weight: 700; font-size: 15px; color: var(--green-dark); }
         .att-card-toggle { background: none; border: none; color: var(--green); cursor: pointer; font-size: 12px; font-family: inherit; }
@@ -207,14 +207,28 @@
         .att-stat-value.bad { color: #dc2626; }
         .att-stat-value.warn { color: #d97706; }
 
-        .att-detail-wrap { margin-top: 10px; overflow-x: auto; }
-        .att-detail-table { width: 100%; border-collapse: collapse; font-size: 12px; display: none; }
-        .att-detail-table.show { display: table; }
+        .att-detail-wrap { margin-top: 10px; overflow-x: auto; max-height: 60vh; }
+        .att-detail-table { width: 100%; border-collapse: collapse; font-size: 12px; }
         .att-detail-table th, .att-detail-table td { padding: 6px 8px; text-align: left; border-bottom: 1px solid #f0f0f0; white-space: nowrap; }
-        .att-detail-table th { background: #f8f9fa; color: var(--green-dark); font-weight: 600; font-size: 11px; }
+        .att-detail-table th { background: #f8f9fa; color: var(--green-dark); font-weight: 600; font-size: 11px; position: sticky; top: 0; z-index: 1; }
+        .att-detail-table tbody tr:hover { background: #f9fafb; }
         .att-detail-table tr.row-late { background: #fff5f5; }
         .att-detail-table tr.row-early { background: #fffbeb; }
         .att-detail-table tr.row-forgiven { background: #f0fdf4; }
+        .att-detail-table tr.row-untracked { background: #f3f4f6; color: #9ca3af; }
+        .att-detail-table tr.row-untracked .att-late-pill,
+        .att-detail-table tr.row-untracked .att-action-btns { opacity: 0.55; }
+        .att-pill-untracked { display: inline-block; padding: 2px 8px; border-radius: 10px; background: #e5e7eb; color: #6b7280; font-size: 11px; }
+        .att-pill-leave { display: inline-block; padding: 2px 8px; border-radius: 10px; background: #ede9fe; color: #6b21a8; font-size: 11px; margin-right: 4px; }
+        .att-pill-overtime { display: inline-block; padding: 2px 8px; border-radius: 10px; background: #fef3c7; color: #92400e; font-size: 11px; margin-right: 4px; }
+
+        /* 考勤明細 Modal（寬版） */
+        .att-detail-modal { max-width: 1100px; width: 95%; max-height: 85vh; }
+        .att-detail-modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 12px; flex-wrap: wrap; }
+        .att-detail-modal-title { font-size: 16px; font-weight: 700; color: var(--green-dark); margin: 0; }
+        .att-detail-modal-meta { font-size: 12px; color: #6b7280; }
+        .att-detail-modal-close { background: none; border: none; font-size: 22px; cursor: pointer; color: #6b7280; }
+        .att-detail-modal-close:hover { color: #111; }
 
         .att-late-pill { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
         .att-late-pill.auto-late { background: #fee2e2; color: #dc2626; }
@@ -557,6 +571,7 @@
                         <button class="btn btn-secondary" onclick="loadAttendanceMonth()">🔄 重新整理</button>
                         <button class="btn btn-export" onclick="exportAttendanceMonthExcel()">📊 匯出考勤 Excel</button>
                         <button class="btn btn-export" style="background: var(--purple);" onclick="exportCombinedMonthExcel()">📋 整合月報 Excel</button>
+                        <button class="btn btn-secondary" onclick="openAttendanceSettings()" title="考勤系統設定">⚙️ 設定</button>
                     </div>
                     <div class="att-summary-cards" id="attMonthCards">
                         <div class="loading"><div class="spinner"></div>載入中...</div>
@@ -601,6 +616,36 @@
                         <p style="color:#999; padding:20px; text-align:center;">請按「重新整理」載入資料</p>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 考勤明細 Modal -->
+    <div class="modal-overlay" id="attDetailModal" onclick="if(event.target===this)closeModal('attDetailModal')">
+        <div class="modal att-detail-modal">
+            <div class="att-detail-modal-header">
+                <div>
+                    <h3 class="att-detail-modal-title" id="attDetailModalTitle">考勤明細</h3>
+                    <div class="att-detail-modal-meta" id="attDetailModalMeta"></div>
+                </div>
+                <button class="att-detail-modal-close" onclick="closeModal('attDetailModal')" aria-label="關閉">×</button>
+            </div>
+            <div id="attDetailModalBody"></div>
+        </div>
+    </div>
+
+    <!-- 考勤系統設定 Modal -->
+    <div class="modal-overlay" id="attSettingsModal" onclick="if(event.target===this)closeModal('attSettingsModal')">
+        <div class="modal">
+            <h3>⚙️ 考勤系統設定</h3>
+            <div class="form-group">
+                <label>考勤起算日</label>
+                <input type="date" id="attSettingStartDate">
+                <p style="font-size:12px;color:#6b7280;margin-top:6px;">早於此日期的排班不計入考勤統計（不算缺勤、不計遲到/早退）。一般設為「正式啟用打卡系統的第一天」。</p>
+            </div>
+            <div class="modal-buttons">
+                <button class="btn btn-secondary" onclick="closeModal('attSettingsModal')">取消</button>
+                <button class="btn btn-primary" onclick="saveAttendanceSettings()">儲存</button>
             </div>
         </div>
     </div>
@@ -3179,7 +3224,7 @@ async function calculateAccumulatedDiff(currentStats) {
                     <div class="${cardCls}" id="att-card-${s.staff_id}">
                         <div class="att-card-header">
                             <div class="att-card-name">${escapeHtml(s.staff_name)}</div>
-                            <button class="att-card-toggle" onclick="toggleStaffDetail('${s.staff_id}')">明細 ▼</button>
+                            <button class="att-card-toggle" onclick="openStaffDetail('${s.staff_id}')">查看明細 ▸</button>
                         </div>
                         <div class="att-card-stats">
                             <div class="att-stat"><span class="att-stat-label">出勤天數：</span><span class="att-stat-value">${s.total_attended||0}/${s.total_scheduled||0}</span></div>
@@ -3189,34 +3234,43 @@ async function calculateAccumulatedDiff(currentStats) {
                             <div class="att-stat"><span class="att-stat-label">加班：</span><span class="att-stat-value">${Number(s.total_overtime_hours||0).toFixed(1)} h</span></div>
                             <div class="att-stat"><span class="att-stat-label">請假：</span><span class="att-stat-value">${Number(s.total_leave_hours||0).toFixed(1)} h</span></div>
                         </div>
-                        <div id="att-detail-${s.staff_id}"></div>
                     </div>
                 `;
             }).join('');
             container.innerHTML = html;
         }
 
-        function toggleStaffDetail(staffId) {
-            const wrap = document.getElementById(`att-detail-${staffId}`);
-            const card = document.getElementById(`att-card-${staffId}`);
-            if (!wrap) return;
-            // 已展開 → 收起
-            const existing = wrap.querySelector('.att-detail-table');
-            if (existing) {
-                if (existing.classList.contains('show')) {
-                    existing.classList.remove('show');
-                    if (card) card.classList.remove('expanded');
+        // 紀錄目前 Modal 顯示的員工 → 操作完後可重新整理
+        let _attDetailModalStaffId = null;
+
+        // 點擊卡片「查看明細」→ 開啟 Modal（不再 inline 展開，避免其他卡片亂跑）
+        function openStaffDetail(staffId) {
+            _attDetailModalStaffId = staffId;
+            const data = _attendanceState.data;
+            const summary = (data.summary || []).find(s => String(s.staff_id) === String(staffId));
+            const monthLabel = document.getElementById('attMonthInput')?.value || '';
+            const titleEl = document.getElementById('attDetailModalTitle');
+            const metaEl = document.getElementById('attDetailModalMeta');
+            const bodyEl = document.getElementById('attDetailModalBody');
+            if (titleEl) titleEl.textContent = (summary?.staff_name || '考勤明細') + '　' + monthLabel;
+            if (metaEl) {
+                if (summary) {
+                    const eff = summary.effective_start_date || '—';
+                    const td = summary.tracking_disabled_days || 0;
+                    metaEl.innerHTML =
+                        `出勤 ${summary.total_attended||0}/${summary.total_scheduled||0}` +
+                        `　缺勤 ${summary.total_absent||0}` +
+                        `　遲到 ${summary.total_late_count||0} 次 / ${summary.total_late_minutes||0} 分` +
+                        `　早退 ${summary.total_early_leave_count||0} 次 / ${summary.total_early_leave_minutes||0} 分` +
+                        `　加班 ${Number(summary.total_overtime_hours||0).toFixed(1)} h` +
+                        `　請假 ${Number(summary.total_leave_hours||0).toFixed(1)} h` +
+                        `<br>起算日：${eff}${td>0?`　未追蹤 ${td} 天`:''}`;
                 } else {
-                    existing.classList.add('show');
-                    if (card) card.classList.add('expanded');
+                    metaEl.textContent = '';
                 }
-                return;
             }
-            // 第一次展開 → 渲染
-            wrap.innerHTML = renderStaffDetail(staffId);
-            const tbl = wrap.querySelector('.att-detail-table');
-            if (tbl) tbl.classList.add('show');
-            if (card) card.classList.add('expanded');
+            if (bodyEl) bodyEl.innerHTML = renderStaffDetail(staffId);
+            document.getElementById('attDetailModal').classList.add('show');
         }
 
         // 把 HH:MM:SS / HH:MM 都壓成 HH:MM
@@ -3229,64 +3283,88 @@ async function calculateAccumulatedDiff(currentStats) {
 
         function renderStaffDetail(staffId) {
             const data = _attendanceState.data;
-            const days = (data.days || []).filter(d => String(d.staff_id) === String(staffId));
-            if (days.length === 0) return '<p style="font-size:12px;color:#999;padding:8px;">無排班</p>';
+            const days = (data.days || [])
+                .filter(d => String(d.staff_id) === String(staffId))
+                .sort((a, b) => String(a.schedule_date).localeCompare(String(b.schedule_date)));
+            if (days.length === 0) return '<p style="font-size:12px;color:#999;padding:8px;">本月無排班、亦無加班紀錄</p>';
             const rows = days.map(d => {
                 const lateStatus = d.late_status || 'auto';
                 const lateMin = d.late_minutes || 0;
                 const earlyMin = d.early_leave_minutes || 0;
                 const earlyStatus = d.early_leave_status || 'auto';
+                const tracking = !!d.tracking_disabled;
 
-                let latePill;
-                if (lateStatus === 'forgiven') {
-                    latePill = `<span class="att-late-pill forgiven">寬限</span>`;
-                } else if (lateStatus === 'late_confirmed') {
-                    latePill = `<span class="att-late-pill confirmed">確認 ${lateMin} 分</span>`;
-                } else if (lateMin > 0) {
-                    latePill = `<span class="att-late-pill auto-late">自動 ${lateMin} 分</span>`;
+                // 「請假/加班」欄
+                const tags = [];
+                if (d.leave_type) {
+                    tags.push(`<span class="att-pill-leave">${escapeHtml(d.leave_type)} ${Number(d.leave_hours||0).toFixed(1)}h</span>`);
+                }
+                if (Number(d.overtime_hours||0) > 0) {
+                    tags.push(`<span class="att-pill-overtime">加班 ${Number(d.overtime_hours).toFixed(1)}h</span>`);
+                }
+                const leaveOtCell = tags.length ? tags.join('') : '—';
+
+                // 起算日前：所有狀態欄一律顯示「未追蹤」
+                let latePill, earlyPill, lateBtns, earlyBtns;
+                if (tracking) {
+                    latePill = `<span class="att-pill-untracked">未追蹤</span>`;
+                    earlyPill = `<span class="att-pill-untracked">未追蹤</span>`;
+                    lateBtns = '—';
+                    earlyBtns = '—';
                 } else {
-                    latePill = `<span class="att-late-pill ontime">準時</span>`;
+                    if (lateStatus === 'forgiven') {
+                        latePill = `<span class="att-late-pill forgiven">寬限</span>`;
+                    } else if (lateStatus === 'late_confirmed') {
+                        latePill = `<span class="att-late-pill confirmed">確認 ${lateMin} 分</span>`;
+                    } else if (lateMin > 0) {
+                        latePill = `<span class="att-late-pill auto-late">自動 ${lateMin} 分</span>`;
+                    } else {
+                        latePill = `<span class="att-late-pill ontime">準時</span>`;
+                    }
+
+                    if (earlyStatus === 'forgiven') {
+                        earlyPill = `<span class="att-late-pill forgiven">寬限</span>`;
+                    } else if (earlyStatus === 'confirmed') {
+                        earlyPill = `<span class="att-late-pill confirmed">確認 ${earlyMin} 分</span>`;
+                    } else if (earlyMin > 0) {
+                        earlyPill = `<span class="att-late-pill auto-late">自動 ${earlyMin} 分</span>`;
+                    } else {
+                        earlyPill = `<span class="att-late-pill ontime">準時</span>`;
+                    }
+
+                    lateBtns = (lateMin > 0 && d.schedule_id) ? `
+                        <div class="att-action-btns">
+                            <button class="att-mini-btn ${lateStatus==='late_confirmed'?'active-late':''}" onclick="setReviewLate(${d.schedule_id},'late_confirmed')">算遲到</button>
+                            <button class="att-mini-btn ${lateStatus==='forgiven'?'active-forgive':''}" onclick="setReviewLate(${d.schedule_id},'forgiven')">寬限</button>
+                            <button class="att-mini-btn ${lateStatus==='auto'?'active-late':''}" onclick="setReviewLate(${d.schedule_id},'auto')">還原預設</button>
+                        </div>
+                    ` : '—';
+
+                    earlyBtns = (earlyMin > 0 && d.schedule_id) ? `
+                        <div class="att-action-btns">
+                            <button class="att-mini-btn ${earlyStatus==='confirmed'?'active-late':''}" onclick="setReviewEarly(${d.schedule_id},'confirmed')">算早退</button>
+                            <button class="att-mini-btn ${earlyStatus==='forgiven'?'active-forgive':''}" onclick="setReviewEarly(${d.schedule_id},'forgiven')">寬限</button>
+                            <button class="att-mini-btn ${earlyStatus==='auto'?'active-late':''}" onclick="setReviewEarly(${d.schedule_id},'auto')">還原預設</button>
+                        </div>
+                    ` : '—';
                 }
 
-                let earlyPill;
-                if (earlyStatus === 'forgiven') {
-                    earlyPill = `<span class="att-late-pill forgiven">寬限</span>`;
-                } else if (earlyStatus === 'confirmed') {
-                    earlyPill = `<span class="att-late-pill confirmed">確認 ${earlyMin} 分</span>`;
-                } else if (earlyMin > 0) {
-                    earlyPill = `<span class="att-late-pill auto-late">自動 ${earlyMin} 分</span>`;
-                } else {
-                    earlyPill = `<span class="att-late-pill ontime">準時</span>`;
-                }
-
-                const rowCls = lateStatus === 'forgiven' || earlyStatus === 'forgiven' ? 'row-forgiven'
+                const rowCls = tracking ? 'row-untracked'
+                            : (lateStatus === 'forgiven' || earlyStatus === 'forgiven') ? 'row-forgiven'
                             : lateMin > 0 ? 'row-late'
                             : earlyMin > 0 ? 'row-early' : '';
 
-                const lateBtns = lateMin > 0 ? `
-                    <div class="att-action-btns">
-                        <button class="att-mini-btn ${lateStatus==='late_confirmed'?'active-late':''}" onclick="setReviewLate(${d.schedule_id},'late_confirmed')">算遲到</button>
-                        <button class="att-mini-btn ${lateStatus==='forgiven'?'active-forgive':''}" onclick="setReviewLate(${d.schedule_id},'forgiven')">寬限</button>
-                        <button class="att-mini-btn ${lateStatus==='auto'?'active-late':''}" onclick="setReviewLate(${d.schedule_id},'auto')">回自動</button>
-                    </div>
-                ` : '—';
-
-                const earlyBtns = earlyMin > 0 ? `
-                    <div class="att-action-btns">
-                        <button class="att-mini-btn ${earlyStatus==='confirmed'?'active-late':''}" onclick="setReviewEarly(${d.schedule_id},'confirmed')">算早退</button>
-                        <button class="att-mini-btn ${earlyStatus==='forgiven'?'active-forgive':''}" onclick="setReviewEarly(${d.schedule_id},'forgiven')">寬限</button>
-                        <button class="att-mini-btn ${earlyStatus==='auto'?'active-late':''}" onclick="setReviewEarly(${d.schedule_id},'auto')">回自動</button>
-                    </div>
-                ` : '—';
-
                 const inDisp = d.actual_in ? formatTimeShort(d.actual_in) : '—';
                 const outDisp = d.actual_out ? formatTimeShort(d.actual_out) : '—';
-                const periodDisp = `${shortHm(d.start_time)} ~ ${shortHm(d.end_time)}`;
+                const periodDisp = (d.start_time || d.end_time)
+                    ? `${shortHm(d.start_time)} ~ ${shortHm(d.end_time)}`
+                    : '—';
                 return `
                     <tr class="${rowCls}">
                         <td>${d.schedule_date}</td>
                         <td>${escapeHtml(d.shift_type||'')}</td>
                         <td>${periodDisp}</td>
+                        <td>${leaveOtCell}</td>
                         <td>${inDisp}</td>
                         <td>${outDisp}</td>
                         <td>${latePill}</td>
@@ -3300,12 +3378,48 @@ async function calculateAccumulatedDiff(currentStats) {
                 <div class="att-detail-wrap">
                     <table class="att-detail-table">
                         <thead>
-                            <tr><th>日期</th><th>班別</th><th>排定時段</th><th>上班打卡</th><th>下班打卡</th><th>遲到</th><th>早退</th><th>遲到動作</th><th>早退動作</th></tr>
+                            <tr><th>日期</th><th>班別</th><th>排定時段</th><th>請假/加班</th><th>上班打卡</th><th>下班打卡</th><th>遲到</th><th>早退</th><th>遲到動作</th><th>早退動作</th></tr>
                         </thead>
                         <tbody>${rows}</tbody>
                     </table>
                 </div>
             `;
+        }
+
+        // 考勤系統設定（讀寫 system_settings）
+        async function openAttendanceSettings() {
+            try {
+                const res = await callEdge('getSystemSettings', { keys: ['attendance_tracking_start_date'] });
+                const cur = res?.settings?.attendance_tracking_start_date || '';
+                document.getElementById('attSettingStartDate').value = cur;
+                document.getElementById('attSettingsModal').classList.add('show');
+            } catch (e) {
+                showToast('讀取設定失敗：' + (e.message || e));
+            }
+        }
+
+        async function saveAttendanceSettings() {
+            const v = (document.getElementById('attSettingStartDate').value || '').trim();
+            if (v && !/^\d{4}-\d{2}-\d{2}$/.test(v)) {
+                showToast('日期格式不正確');
+                return;
+            }
+            try {
+                const res = await callEdge('setSystemSettings', {
+                    items: [{
+                        key: 'attendance_tracking_start_date',
+                        value: v,
+                        description: '考勤起算日：早於此日的排班不計入考勤統計（不算缺勤、不計遲到/早退）',
+                    }],
+                });
+                if (!res.success) throw new Error(res.error || '儲存失敗');
+                showToast('已儲存');
+                closeModal('attSettingsModal');
+                // 立即重算當月
+                await loadAttendanceMonth();
+            } catch (e) {
+                showToast('儲存失敗：' + (e.message || e));
+            }
         }
 
         async function setReviewLate(scheduleId, status) {
@@ -3317,6 +3431,11 @@ async function calculateAccumulatedDiff(currentStats) {
                 if (!res.success) throw new Error(res.error || '操作失敗');
                 showToast('已更新');
                 await loadAttendanceMonth();
+                // Modal 開啟中 → 重新渲染明細
+                const modal = document.getElementById('attDetailModal');
+                if (modal && modal.classList.contains('show') && _attDetailModalStaffId) {
+                    openStaffDetail(_attDetailModalStaffId);
+                }
             } catch (e) { showToast('失敗：' + e.message); }
         }
 
@@ -3329,6 +3448,10 @@ async function calculateAccumulatedDiff(currentStats) {
                 if (!res.success) throw new Error(res.error || '操作失敗');
                 showToast('已更新');
                 await loadAttendanceMonth();
+                const modal = document.getElementById('attDetailModal');
+                if (modal && modal.classList.contains('show') && _attDetailModalStaffId) {
+                    openStaffDetail(_attDetailModalStaffId);
+                }
             } catch (e) { showToast('失敗：' + e.message); }
         }
 
