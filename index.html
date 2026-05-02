@@ -709,6 +709,18 @@
         const EDGE_FUNCTION_URL = 'https://mnjilhpztnowaplggvkk.supabase.co/functions/v1/schedule-api';
         const MY_LINE_UID = urlParams.get('uid') || '';
         async function callEdge(action, params = {}) {
+  // ── Sprint 0 Phase 1: 自動帶上 staffLineUid ──
+  let _uid = null;
+  try {
+    _uid = sessionStorage.getItem('staffLineUid');
+    if (!_uid) {
+      const _st = JSON.parse(sessionStorage.getItem('currentStaff') || 'null');
+      _uid = _st?.lineUid || _st?.line_id_edu || null;
+    }
+  } catch(e) {}
+  const _body = { action, ...(params || {}) };
+  if (_uid && !_body.lineUid) _body.lineUid = _uid;
+
             // 自動帶 lineUid 供 auth 驗證
             if (MY_LINE_UID && !params.lineUid) {
                 params.lineUid = MY_LINE_UID;
@@ -716,7 +728,7 @@
             const res = await fetch(EDGE_FUNCTION_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action, ...params })
+                body: JSON.stringify(_body)
             });
             if (!res.ok) throw new Error('Edge Function error: ' + res.status);
             return res.json();
