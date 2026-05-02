@@ -815,13 +815,25 @@
         const EDGE_FUNCTION_URL = 'https://mnjilhpztnowaplggvkk.supabase.co/functions/v1/schedule-api';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1uamlsaHB6dG5vd2FwbGdndmtrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU3MDA0ODYsImV4cCI6MjA4MTI3NjQ4Nn0.X3e9DF3iT2KUR9ma3_Ins01vG607R155v0xia8hO_Qg';
         async function callEdge(action, params = {}) {
+  // ── Sprint 0 Phase 1: 自動帶上 staffLineUid ──
+  let _uid = null;
+  try {
+    _uid = sessionStorage.getItem('staffLineUid');
+    if (!_uid) {
+      const _st = JSON.parse(sessionStorage.getItem('currentStaff') || 'null');
+      _uid = _st?.lineUid || _st?.line_id_edu || null;
+    }
+  } catch(e) {}
+  const _body = { action, ...(params || {}) };
+  if (_uid && !_body.lineUid) _body.lineUid = _uid;
+
             const res = await fetch(EDGE_FUNCTION_URL, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': 'Bearer ' + SUPABASE_ANON_KEY
                 },
-                body: JSON.stringify({ action, ...params })
+                body: JSON.stringify(_body)
             });
             if (!res.ok) throw new Error('Edge Function error: ' + res.status);
             return res.json();
@@ -2234,8 +2246,11 @@ data.forEach(r => {
         // 自訂班別顏色：依時數分（≤4h 淡藍 / >4h 深藍）
         function getCustomShiftColor(startTime, endTime) {
             if (!startTime || !endTime) return '#7dd3fc'; // 無法判斷時預設淡藍
-            const [sh, sm] = startTime.replace(/:\d{2}$/, '').split(':').map(Number);
-            const [eh, em] = endTime.replace(/:\d{2}$/, '').split(':').map(Number);
+            // 同時支援 'HH:MM' 與 'HH:MM:SS' 兩種格式
+            const parts1 = String(startTime).split(':').map(Number);
+            const parts2 = String(endTime).split(':').map(Number);
+            const sh = parts1[0] || 0, sm = parts1[1] || 0;
+            const eh = parts2[0] || 0, em = parts2[1] || 0;
             const hours = (eh * 60 + em - sh * 60 - sm) / 60;
             return hours > 4 ? '#0284c7' : '#7dd3fc';
         }
