@@ -1373,7 +1373,9 @@ data.forEach(r => {
                     status: '待審核'
                 };
                 try {
-                    await callEdge('submitOvertimeRequest', insertData);
+                    // Sprint 1 hotfix: 用 { records: [...] } 格式包起來
+                    // 避免 callEdge 注入的 lineUid 被 INSERT 進 overtime_records 造成 400
+                    await callEdge('submitOvertimeRequest', { records: [insertData] });
                 } catch (error) { showToast('❌ 送出失敗：' + error.message); return; }
 
                 showToast('✅ 加班申請已送出！');
