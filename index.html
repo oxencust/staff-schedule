@@ -707,6 +707,7 @@
         }
        // ============ 設定區（請在這裡修改）============
         const EDGE_FUNCTION_URL = 'https://mnjilhpztnowaplggvkk.supabase.co/functions/v1/schedule-api';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1uamlsaHB6dG5vd2FwbGdndmtrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU3MDA0ODYsImV4cCI6MjA4MTI3NjQ4Nn0.X3e9DF3iT2KUR9ma3_Ins01vG607R155v0xia8hO_Qg';
         const MY_LINE_UID = urlParams.get('uid') || '';
         async function callEdge(action, params = {}) {
   // ── Sprint 0 Phase 1 + Phase 3: staffLineUid + LINE ID Token ──
@@ -746,7 +747,7 @@
             if (MY_LINE_UID && !params.lineUid) {
                 params.lineUid = MY_LINE_UID;
             }
-            const _headers = { 'Content-Type': 'application/json' };
+            const _headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY, 'apikey': SUPABASE_ANON_KEY };
   if (_idToken) _headers['X-Line-IdToken'] = _idToken;
   const res = await fetch(EDGE_FUNCTION_URL, {
     method: 'POST',
@@ -2700,13 +2701,18 @@ async function calculateAccumulatedDiff(currentStats) {
                             overtimeHours = calculateOvertimeHours(item.overtimeStart, item.overtimeEnd);
                         }
 
+                        // 🆕 v2: 9-tuple，多帶加班時段供 GAS 月表 cell 顯示（只送已審核的）
+                        const isApprovedOT = !!(item.overtimeStart && item.overtimeEnd && item.overtimeStatus === '已審核');
                         return [
                             item.staffName,
                             item.shiftId,
-                            overtimeHours,  // ← 使用計算後的時數
+                            overtimeHours,
                             item.note || '',
                             item.leaveHours || 0,
-                            item.shiftName || ''
+                            item.shiftName || '',
+                            isApprovedOT ? item.overtimeStart : '',  // 🆕 [6] 加班開始
+                            isApprovedOT ? item.overtimeEnd   : '',  // 🆕 [7] 加班結束
+                            isApprovedOT ? '已審核' : ''             // 🆕 [8] 加班狀態
                         ];
                     });
                 }
