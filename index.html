@@ -1576,12 +1576,12 @@
     schedule[dateStr].forEach(item => {
         const shift = shifts.find(s => s.id === item.shiftId);
         const color = item.shiftColor || (shift ? shift.color : '#999');
-        const shiftName = item.shiftName || (shift ? shift.name : item.shiftId);
+        let shiftName = item.shiftName || (shift ? shift.name : item.shiftId);
         const isLeave = shift && shift.isLeave;
         const note = item.note ? `（${item.note}）` : '';
-        
+
         html += '<div class="schedule-item-full" style="background: ' + color + ';">';
-        
+
         if (isLeave) {
             // 假別顯示
             const leaveIcon = shift.leaveType === '病假' ? '🏥' : shift.leaveType === '事假' ? '📝' : shift.leaveType === '特休' ? '🌴' : '🎉';
@@ -1592,7 +1592,7 @@
             // ✅ 一般班別：計算工時和顯示時段
             let workInfo;
             let displayTime = '';  // 🆕 統一的時間顯示變數
-            
+
             // 🆕 優先順序：shift.time > item.shiftTime > 從 shiftName 解析
             if (shift && shift.time) {
                 workInfo = calculateWorkHours(shift.time);
@@ -1612,18 +1612,28 @@
             } else {
                 workInfo = { rawHours: 0, breakMinutes: 0, netHours: 0 };
             }
-            
+
             // 計算加班時數（只計算已審核的）
             let overtime = 0;
             if (item.overtimeStart && item.overtimeEnd && item.overtimeStatus === '已審核') {
                 overtime = calculateOvertimeHours(item.overtimeStart, item.overtimeEnd);
             }
-        
+
             let appliedLeaveHours = 0;
             if (item.leaveType && item.leaveHours && item.leaveHours > 0) {
                 appliedLeaveHours = Number(item.leaveHours) || 0;
             }
-            
+
+            // 🆕 v2: 判斷是否為「假日臨時加班」(custom_ shift_type 且沒有任何 shift.time / shiftTime，但有已審核加班)
+            const isOffDayOT =
+                (typeof item.shiftId === 'string' && item.shiftId.startsWith('custom_')) &&
+                !(shift && shift.time) && !item.shiftTime &&
+                item.overtimeStart && item.overtimeEnd && item.overtimeStatus === '已審核';
+            if (isOffDayOT) {
+                shiftName = '🆕 加班';                                    // 取代「自訂」
+                displayTime = item.overtimeStart + '-' + item.overtimeEnd; // 主要時段直接放加班時段
+            }
+
             let overtimeDisplay = '';
             if (item.overtimeStart && item.overtimeEnd && item.overtimeStatus === '已審核') {
                 const otHours = calculateOvertimeHours(item.overtimeStart, item.overtimeEnd);
@@ -1632,22 +1642,27 @@
                 const otHours = calculateOvertimeHours(item.overtimeStart, item.overtimeEnd);
                 overtimeDisplay = ` <span style="color:#f59e0b;">+${otHours}h⏳</span>`;
             }
-            
+
             let leaveDisplay = '';
             if (item.leaveType && item.leaveHours && item.leaveHours > 0) {
                 const leaveIcon = item.leaveType === '病假' ? '🏥' : item.leaveType === '事假' ? '📝' : item.leaveType === '特休' ? '🌴' : item.leaveType === '補休' ? '🔄' : '🎉';
                 leaveDisplay = ` <span style="color:#9ca3af;">${leaveIcon}-${item.leaveHours}h</span>`;
             }
-            
+
             // 🆕 顯示員工、班別、備註、加班、請假
             html += '<div>' + item.staffName + ' ' + shiftName + note + overtimeDisplay + leaveDisplay + '</div>';
-            
+
             // 🆕 顯示時段（如果有的話）
             if (displayTime) {
                 html += '<div class="time">' + displayTime + '</div>';
             }
+
+            // 🆕 v2: 「有排班 + 已審核加班」加一行加班時段（只在不是 off-day OT 時顯示，避免重複）
+            if (!isOffDayOT && item.overtimeStart && item.overtimeEnd && item.overtimeStatus === '已審核') {
+                html += '<div class="time" style="color:#10b981;">🕐 加班 ' + item.overtimeStart + '-' + item.overtimeEnd + '</div>';
+            }
         }
-        
+
         html += '</div>';
     });
     html += '</div>';
