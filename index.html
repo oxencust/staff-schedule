@@ -706,7 +706,10 @@
             });
         }
        // ============ 設定區（請在這裡修改）============
-        const EDGE_FUNCTION_URL = 'https://mnjilhpztnowaplggvkk.supabase.co/functions/v1/schedule-api';
+        // Sprint 3 Phase 5 / Wave 5 #8 cutover (2026-05-15)：
+        //   schedule-hendia.zeabur.app 已上線 + smoke 通過 → 切換 Zeabur
+        //   緊急 rollback：把這行換回 'https://mnjilhpztnowaplggvkk.supabase.co/functions/v1/schedule-api'
+        const EDGE_FUNCTION_URL = 'https://schedule-hendia.zeabur.app/';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1uamlsaHB6dG5vd2FwbGdndmtrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU3MDA0ODYsImV4cCI6MjA4MTI3NjQ4Nn0.X3e9DF3iT2KUR9ma3_Ins01vG607R155v0xia8hO_Qg';
         const MY_LINE_UID = urlParams.get('uid') || '';
         async function callEdge(action, params = {}) {
